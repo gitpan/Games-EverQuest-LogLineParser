@@ -29,18 +29,37 @@ interesting bits from an EverQuest log file.
 
 =item parse_eq_line($eq_line)
 
-Returns a hash ref, containing variable keys depending on the type of line
-that was passed as the first argument. if the line was not recognized, then
-false is returned.
+Returns a hash ref, containing variable keys depending on the determined line
+type of the given log line. If the line was not recognized, then false is
+returned.
 
 Two keys that will always be present, if the line was recognized, are
 C<time_stamp> and C<line_type>. The first will contain the time string from
 the line, while the latter will be a string indicating how the line was
 classified. A given C<line_type> hash ref, will always contain the same keys,
-though some of the values may be C<undef>.
+though some of the values may be C<undef> or empty.
 
-Knowing the C<line_type> allows you to determine the keys from the
-L<LINE TYPES> section below.
+For a list of line types (and associated keys) see the L<LINE TYPES> section
+below.
+
+=item parse_eq_line_type($line_type, $eq_line)
+
+If you expect a line to be of a certain type, and want to test or parse it as
+that type, you can use this function. Call it with the expected line type
+and the log line to test or parse.
+
+Returns a hash ref, containing variable keys depending on the type of line
+that was passed. If the line could not be parsed as the given line type,
+then false is returned.
+
+Two keys that will always be present, if the line was recognized, are
+C<time_stamp> and C<line_type>. The first will contain the time string from
+the line, while the latter will be a string indicating how the line was
+classified. A given C<line_type> hash ref, will always contain the same keys,
+though some of the values may be C<undef> or empty.
+
+For a list of line types (and associated keys) see the L<LINE TYPES> section
+below.
 
 =item parse_eq_time_stamp($parsed_line->{'time_stamp'})
 
@@ -58,6 +77,11 @@ following structure:
     year  => '2003',
    }
 
+=item all_possible_line_types()
+
+Returns a list of all possible line types for the hash refs that are returned by
+C<parse_eq_line()>.
+
 =item all_possible_keys()
 
 Returns a list of all possible keys for the hash refs that are returned by
@@ -67,7 +91,8 @@ C<parse_eq_line()>.
 
 =head1 EXPORT
 
-By default the C<parse_eq_line> and C<parse_eq_time_stamp> subroutines are exported.
+By default the C<parse_eq_line>, C<parse_eq_line_type>, C<parse_eq_time_stamp>,
+C<all_possible_line_types> and C<all_possible_keys> subroutines are exported.
 
 =head1 SCRIPTS
 
@@ -103,15 +128,27 @@ use 5.006;
 use strict;
 use warnings;
 
+use Carp;
+
 require Exporter;
 
 our @ISA = qw/ Exporter /;
 
-our @EXPORT = qw/ parse_eq_line parse_eq_time_stamp all_possible_keys /;
+our @EXPORT = qw/ parse_eq_line parse_eq_line_type parse_eq_time_stamp
+                  all_possible_line_types all_possible_keys /;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
-my @line_types;
+my (@line_types, %line_types);
+
+INIT
+   {
+   for my $line_type (@line_types)
+      {
+      my $line_type_name = $line_type->{'handler'}->()->{'line_type'};
+      $line_types{$line_type_name} = $line_type;
+      }
+   }
 
 ## returns a parsed line hash ref if the line is understood, else false
 sub parse_eq_line
@@ -130,6 +167,29 @@ sub parse_eq_line
          $parsed_line->{'time_stamp'} = $time_stamp;
          return $parsed_line;
          }
+      }
+
+   return;
+
+   }
+
+## returns a parsed line hash ref if the line is of the given type, else false
+sub parse_eq_line_type
+   {
+   my ($line_type_name, $line) = @_;
+
+   confess "invalid line type ($line_type_name)"
+      unless exists $line_types{$line_type_name};
+
+   return unless length $line > 28;
+
+   my $time_stamp = substr($line, 0, 27, '');
+
+   if (my @parts = $line =~ $line_types{$line_type_name}->{'rx'})
+      {
+      my $parsed_line = $line_types{$line_type_name}->{'handler'}->(@parts);
+      $parsed_line->{'time_stamp'} = $time_stamp;
+      return $parsed_line;
       }
 
    return;
@@ -159,6 +219,14 @@ sub parse_eq_time_stamp
 
    }
 
+## returns all possible line types
+sub all_possible_line_types
+   {
+
+   return map { $_->{'handler'}->()->{'line_type'} } @line_types;
+
+   }
+
 ## returns all possible keys from the set of all parsed line hash refs
 sub all_possible_keys
    {
@@ -176,47 +244,6 @@ sub all_possible_keys
    return ( sort (keys %all_keys, 'time_stamp') );
 
    }
-
-
-=item MOB_HITS_YOU
-
-   input line:
-
-      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry hits YOU for 161 points of damage.
-
-   output hash ref:
-
-      {
-         line_type  => 'MOB_HITS_YOU',
-         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
-         attacker   => 'A Bloodguard crypt sentry',
-         attack     => 'hit',
-         amount     => '161',
-      };
-
-   comments:
-
-      none
-
-=cut
-
-## needs to be before MELEE_DAMAGE
-push @line_types,
-   {
-   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul)(?:s|es) YOU for (\d+) points? of damage\.\Z/,
-   handler => sub
-      {
-      my ($attacker, $attack, $amount) = @_;
-      return
-         {
-         line_type  => 'MOB_HITS_YOU',
-         attacker   => $attacker,
-         attack     => $attack,
-         amount     => $amount,
-         };
-      }
-
-   };
 
 =item MELEE_DAMAGE
 
@@ -250,9 +277,9 @@ push @line_types,
       return
          {
          line_type  => 'MELEE_DAMAGE',
-         attacker   => ucfirst $attacker,
+         attacker   => $attacker,
          attack     => $attack,
-         attackee   => ucfirst $attackee,
+         attackee   => $attackee,
          amount     => $amount,
          };
       }
@@ -290,7 +317,7 @@ push @line_types,
          {
          line_type  => 'YOU_MISS_MOB',
          attack     => $attack,
-         attackee   => ucfirst $attackee,
+         attackee   => $attackee,
          };
       }
    };
@@ -441,7 +468,7 @@ push @line_types,
          {
          line_type  => 'MOB_REPELS_HIT',
          attack     => $attack,
-         attackee   => ucfirst $attackee,
+         attackee   => $attackee,
          repel      => $repel,
          };
       }
@@ -477,7 +504,7 @@ push @line_types,
       return
          {
          line_type  => 'SLAIN_BY_YOU',
-         slayee     => ucfirst $slayee,
+         slayee     => $slayee,
          };
       }
 
@@ -550,7 +577,7 @@ push @line_types,
       return
          {
          line_type  => 'SLAIN_BY_OTHER',
-         slayee     => ucfirst $slayee,
+         slayee     => $slayee,
          slayer     => $slayer,
          };
       }
@@ -631,7 +658,7 @@ push @line_types,
       return
          {
          line_type  => 'DAMAGE_SHIELD',
-         attacker   => ucfirst $attacker,
+         attacker   => $attacker,
          amount     => $amount,
          };
       }
@@ -670,7 +697,7 @@ push @line_types,
          {
          line_type  => 'DIRECT_DAMAGE',
          attacker   => $attacker,
-         attackee   => ucfirst $attackee,
+         attackee   => $attackee,
          amount     => $amount,
          };
       }
@@ -805,7 +832,7 @@ push @line_types,
          gold       => $moneys{'gold'}     || 0,
          silver     => $moneys{'silver'}   || 0,
          copper     => $moneys{'copper'}   || 0,
-         merchant   => ucfirst $merchant,
+         merchant   => $merchant,
          };
       }
 
@@ -965,7 +992,7 @@ push @line_types,
       return
          {
          line_type  => 'YOU_SLAIN',
-         slayer     => ucfirst $slayer,
+         slayer     => $slayer,
          };
       }
 
@@ -1000,7 +1027,7 @@ push @line_types,
       return
          {
          line_type  => 'TRACKING_MOB',
-         trackee    => ucfirst $trackee,
+         trackee    => $trackee,
          };
       }
 
@@ -1466,7 +1493,7 @@ push @line_types,
       return
          {
          line_type  => 'OTHER_CASTS',
-         caster     => ucfirst $caster,
+         caster     => $caster,
          };
       }
 
@@ -1710,7 +1737,7 @@ push @line_types,
          {
          ($afk, $linkdead) = ('', 'LINKDEAD');
          }
-      if ($anon_level_class ne 'ANONYMOUS')
+      if ($anon_level_class && $anon_level_class ne 'ANONYMOUS')
          {
          ($level, $class) = split ' ', $anon_level_class;
          }

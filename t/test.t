@@ -25,7 +25,7 @@ my @tests = (
          line_type => 'MELEE_DAMAGE',
          attacker => 'You',
          attack   => 'slash',
-         attackee => 'A Bloodguard crypt sentry',
+         attackee => 'a Bloodguard crypt sentry',
          amount   => '88',
          },
       },
@@ -35,16 +35,17 @@ my @tests = (
       out => {
          line_type => 'YOU_MISS_MOB',
          attack   => 'kick',
-         attackee => 'A Bloodguard crypt sentry',
+         attackee => 'a Bloodguard crypt sentry',
          },
       },
 
       {
       in => qq|[Sat Sep 27 23:18:53 2003] A Bloodguard crypt sentry hits YOU for 161 points of damage.\n|,
       out => {
-         line_type => 'MOB_HITS_YOU',
+         line_type => 'MELEE_DAMAGE',
          attacker => 'A Bloodguard crypt sentry',
          attack   => 'hit',
+         attackee => 'YOU',
          amount   => '161',
          },
       },
@@ -82,7 +83,7 @@ my @tests = (
       out => {
          line_type => 'MOB_REPELS_HIT',
          attack   => 'slash',
-         attackee => 'A Bloodguard crypt sentry',
+         attackee => 'a Bloodguard crypt sentry',
          repel    => 'riposte',
          },
       },
@@ -91,7 +92,7 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] You have slain a Bloodguard crypt sentry!\n|,
       out => {
          line_type => 'SLAIN_BY_YOU',
-         slayee => 'A Bloodguard crypt sentry',
+         slayee => 'a Bloodguard crypt sentry',
          },
       },
 
@@ -108,7 +109,7 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] a Bloodguard crypt sentry has been slain by Soandso!\n|,
       out => {
          line_type => 'SLAIN_BY_OTHER',
-         slayee => 'A Bloodguard crypt sentry',
+         slayee => 'a Bloodguard crypt sentry',
          slayer => 'Soandso',
          },
       },
@@ -128,7 +129,7 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] a Bloodguard crypt sentry was hit by non-melee for 8 points of damage.\n|,
       out => {
          line_type => 'DAMAGE_SHIELD',
-         attacker => 'A Bloodguard crypt sentry',
+         attacker => 'a Bloodguard crypt sentry',
          amount   => '8',
          },
       },
@@ -138,7 +139,7 @@ my @tests = (
       out => {
          line_type => 'DIRECT_DAMAGE',
          attacker => 'Soandso',
-         attackee => 'A Bloodguard crypt sentry',
+         attackee => 'a Bloodguard crypt sentry',
          amount   => '300',
          },
       },
@@ -219,7 +220,7 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] You have been slain by a Bloodguard crypt sentry!\n|,
       out => {
          line_type => 'YOU_SLAIN',
-         slayer => 'A Bloodguard crypt sentry',
+         slayer => 'a Bloodguard crypt sentry',
          },
       },
 
@@ -227,7 +228,7 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] You begin tracking a Bloodguard crypt sentry.\n|,
       out => {
          line_type => 'TRACKING_MOB',
-         trackee => 'A Bloodguard crypt sentry',
+         trackee => 'a Bloodguard crypt sentry',
          },
       },
 
@@ -457,8 +458,14 @@ my @tests = (
 for my $test (@tests)
    {
 
-   my $parsed_line = parse_eq_line($test->{'in'});
    $test->{'out'}{'time_stamp'} = '[Sat Sep 27 23:18:53 2003] ';
+
+   ## parse any
+   my $parsed_line = parse_eq_line($test->{'in'});
+   is_deeply( $parsed_line, $test->{'out'}, $test->{'in'});
+
+   ## parse type
+   $parsed_line = parse_eq_line_type($test->{'out'}{'line_type'}, $test->{'in'});
    is_deeply( $parsed_line, $test->{'out'}, $test->{'in'});
 
    }

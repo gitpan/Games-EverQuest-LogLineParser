@@ -1,6 +1,12 @@
 Revision history for Perl extension Games::EverQuest::LogLineParser.
 
-0.03  Wed Nov 13 10:38:12 2003
+0.04  Sat Nov 15 01:39:15 2003
+   - merged MELEE_DAMAGE and MOB_HITS_YOU line types
+   - no longer force mob names into ucfirst
+   - added parse_eq_line_type() for parsing a line with a particular
+      expectation of its type
+
+0.03  Thu Nov 13 10:38:12 2003
    - added eqlog_line_type_frequency.pl script to distribution
    - added eqlog_unrecognized_lines.pl script to distribution
    - completed parsing of PLAYER_LISTING line types
