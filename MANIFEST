@@ -3,6 +3,9 @@ LogLineParser.pm
 Makefile.PL
 MANIFEST
 README
-test.pl
+t/test.t
 META.yml                                 Module meta-data (added by MakeMaker)
 eqlog2csv.pl
+eqlog_line_type_frequency.pl
+eqlog_unrecognized_lines.pl
+

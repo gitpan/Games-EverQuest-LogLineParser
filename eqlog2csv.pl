@@ -1,11 +1,15 @@
+## convert an EverQuest log file to a CSV (actually '|' separated) file
+
 use strict;
 use warnings;
 
 use Games::EverQuest::LogLineParser;
 
-die "USAGE: perl eqlog2csv.pl <eqlog_file> <output_file>\n" unless @ARGV == 2;
+die "USAGE: perl eqlog2csv.pl <eqlog_file> [output_file]\n" unless @ARGV > 0;
 
 my ($eqlog_file, $output_file) = @ARGV;
+
+$output_file = defined $output_file ? $output_file : '-';
 
 open (my $eqlog_fh,  $eqlog_file)     || die "$eqlog_file: $!";
 open (my $output_fh, ">$output_file") || die "$output_file: $!";

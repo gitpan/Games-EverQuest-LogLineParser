@@ -60,13 +60,36 @@ following structure:
 
 =item all_possible_keys()
 
-Returns a list of all possible keys for the hash refs that are returned by C<parse_eq_line()>.
+Returns a list of all possible keys for the hash refs that are returned by
+C<parse_eq_line()>.
 
 =back
 
 =head1 EXPORT
 
 By default the C<parse_eq_line> and C<parse_eq_time_stamp> subroutines are exported.
+
+=head1 SCRIPTS
+
+Several scripts have been included as both tools and examples. All default to
+STDOUT for output, but accept an optional file name for the second argument
+as well.
+
+=over 4
+
+=item eqlog2csv.pl <eqlog_file> [output_file]
+
+   Converts an EverQuest log file into a CSV file (uses '|' character rather than commas).
+
+=item eqlog_line_type_frequency.pl <eqlog_file> [output_file]
+
+   Reports the frequency of all line types seen in the given EverQuest log file.
+
+=item eqlog_unrecognized_lines.pl <eqlog_file> [output_file]
+
+   Prints unrecognized lines from an EverQuest log file.
+
+=back
 
 =head1 LINE TYPES
 
@@ -86,7 +109,7 @@ our @ISA = qw/ Exporter /;
 
 our @EXPORT = qw/ parse_eq_line parse_eq_time_stamp all_possible_keys /;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 my @line_types;
 
@@ -200,7 +223,6 @@ push @line_types,
    input line:
 
       [Mon Oct 13 00:42:36 2003] You slash a Bloodguard crypt sentry for 88 points of damage.
-      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry hits YOU for 161 points of damage.
 
    output hash ref:
 
@@ -1613,12 +1635,16 @@ push @line_types,
       {
          line_type  => 'PLAYER_LISTING',
          time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         afk        => '',
+         linkdead   => '',
+         anon       => '',
          level      => '56',
          class      => 'Outrider',
          name       => 'Soandso',
          race       => 'Half Elf',
          guild      => 'The Foobles',
          zone       => '',
+         lfg        => '',
       };
 
    input line:
@@ -1630,12 +1656,16 @@ push @line_types,
       {
          line_type  => 'PLAYER_LISTING',
          time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         afk        => '',
+         linkdead   => '',
+         anon       => '',
          level      => '65',
          class      => 'Deceiver',
          name       => 'Soandso',
          race       => 'Barbarian',
          guild      => 'The Foobles',
          zone       => 'potranquility',
+         lfg        => '',
       };
 
    comments:
@@ -1646,19 +1676,58 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\A(?:AFK )?\[(\d+) (.+?)\] (\w+) \((.+?)\) (?:<(.+?)>)? ?(?:ZONE: (\w+))?\s*\Z/,
+   rx      => qr/
+      \A                                      ##
+      (\ AFK\ |\ <LINKDEAD>)?                 ## AFK or LINKDEAD
+      \[                                      ##
+      (ANONYMOUS|\d+\ [^]]+)                  ## ANONYMOUS or level and class
+      \]                                      ##
+      \s+                                     ##
+      (\w+)                                   ## player name
+      \s+                                     ##
+      (?:\((.+?)\))?                          ## player race
+      \s*                                     ##
+      (?:<(.+?)>)?                            ## guild tag
+      \s*                                     ##
+      (?:ZONE:\ (\w+))?                       ## zone
+      \s*                                     ##
+      (LFG)?                                  ## LFG tag
+      \Z                                      ##
+      /x,
    handler => sub
       {
-      my ($level, $class, $name, $race, $guild, $zone) = @_;
+      my ($afk_ld, $anon_level_class, $name, $race, $guild, $zone, $lfg) = @_;
+      my ($afk, $linkdead, $anon, $level, $class);
+      if (! defined $afk_ld)
+         {
+         ($afk, $linkdead) = ('', '');
+         }
+      elsif ($afk_ld eq ' AFK ')
+         {
+         ($afk, $linkdead) = ('AFK', '');
+         }
+      else
+         {
+         ($afk, $linkdead) = ('', 'LINKDEAD');
+         }
+      if ($anon_level_class ne 'ANONYMOUS')
+         {
+         ($level, $class) = split ' ', $anon_level_class;
+         }
+      else { $anon = $anon_level_class; }
       return
          {
          line_type  => 'PLAYER_LISTING',
-         level      => ($level || ''),
-         class      => ($class || ''),
+         afk        => ($afk       || ''),
+         linkdead   => ($linkdead  || ''),
+         anon       => ($anon      || ''),
+         level      => ($level     || ''),
+         class      => ($class     || ''),
          name       => $name,
-         race       => ($race  || ''),
-         guild      => ($guild || ''),
-         zone       => ($zone  || ''),
+         race       => ($race      || ''),
+         guild      => ($guild     || ''),
+         zone       => ($zone      || ''),
+         lfg        => ($lfg       || ''),
          };
       }
 
@@ -1830,8 +1899,6 @@ fooble, E<lt>fooble@cpan.orgE<gt>
 =over 4
 
 =item - optimize ordering of @line_types
-
-=item - make testing prettier (Test::Harness?)
 
 =item - add unrecognized yet useful lines
 

@@ -382,12 +382,16 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] [56 Outrider] Soandso (Half Elf) <The Foobles>\n|,
       out => {
          line_type => 'PLAYER_LISTING',
+         afk        => '',
+         linkdead   => '',
+         anon  => '',
          level => '56',
          class => 'Outrider',
          name  => 'Soandso',
          race  => 'Half Elf',
          guild => 'The Foobles',
          zone  => '',
+         lfg   => '',
          },
       },
 
@@ -395,12 +399,16 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] [65 Deceiver] Soandso (Barbarian) <The Foobles> ZONE: potranquility\n|,
       out => {
          line_type => 'PLAYER_LISTING',
+         afk        => '',
+         linkdead   => '',
+         anon  => '',
          level => '65',
          class => 'Deceiver',
          name  => 'Soandso',
          race  => 'Barbarian',
          guild => 'The Foobles',
          zone  => 'potranquility',
+         lfg   => '',
       },
       },
 

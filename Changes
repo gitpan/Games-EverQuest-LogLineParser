@@ -1,5 +1,11 @@
 Revision history for Perl extension Games::EverQuest::LogLineParser.
 
+0.03  Wed Nov 13 10:38:12 2003
+   - added eqlog_line_type_frequency.pl script to distribution
+   - added eqlog_unrecognized_lines.pl script to distribution
+   - completed parsing of PLAYER_LISTING line types
+   - now makes use of ./t/ dir and Test::Harness
+
 0.02  Wed Nov 12 08:26:02 2003
    - converted hash based implementation to array based (better control
       of processing order, and likely faster)
