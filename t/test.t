@@ -254,7 +254,7 @@ my @tests = (
       {
       in => qq|[Sat Sep 27 23:18:53 2003] Your target resisted the Ensnaring Roots spell.\n|,
       out => {
-         line_type => 'YOUR_SPELL_RESISTED',
+         line_type => 'SPELL_RESISTED',
          spell => 'Ensnaring Roots',
          },
       },
@@ -304,6 +304,30 @@ my @tests = (
       in => qq|[Sat Sep 27 23:18:53 2003] You say, 'thanks!'\n|,
       out => {
          line_type => 'YOU_SAY',
+         spoken  => 'thanks!',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] You say out of character, 'thanks!'\n|,
+      out => {
+         line_type => 'YOU_OOC',
+         spoken  => 'thanks!',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] You shout, 'thanks!'\n|,
+      out => {
+         line_type => 'YOU_SHOUT',
+         spoken  => 'thanks!',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] You auction, 'thanks!'\n|,
+      out => {
+         line_type => 'YOU_AUCTION',
          spoken  => 'thanks!',
          },
       },
@@ -385,9 +409,19 @@ my @tests = (
       {
       in => qq|[Sat Sep 27 23:18:53 2003] Soandso scores a critical hit! (126)\n|,
       out => {
-         line_type => 'CRITICAL_SCORE',
+         line_type => 'CRITICAL_DAMAGE',
          attacker => 'Soandso',
          type     => 'hit',
+         amount   => '126',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Soandso delivers a critical blast! (126)\n|,
+      out => {
+         line_type => 'CRITICAL_DAMAGE',
+         attacker => 'Soandso',
+         type     => 'blast',
          amount   => '126',
          },
       },
@@ -500,6 +534,79 @@ my @tests = (
       out => {
          line_type => 'GAIN_EXPERIENCE',
          gainer => '',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Game Time: Thursday, April 05, 3176 - 6 PM\n|,
+      out => {
+         line_type => 'GAME_TIME',
+         time => 'Thursday, April 05, 3176 - 6 PM',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Earth Time: Thursday, April 05, 2003 19:25:47\n|,
+      out => {
+         line_type => 'EARTH_TIME',
+         time => 'Thursday, April 05, 2003 19:25:47',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] **A Magic Die is rolled by Soandso.\n|,
+      out => {
+         line_type => 'MAGIC_DIE',
+         roller => 'Soandso',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] **It could have been any number from 0 to 550, but this time it turned up a 492.\n|,
+      out => {
+         line_type => 'ROLL_RESULT',
+         min       => '0',
+         max       => '550',
+         amount    => '492',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Beginning to memorize Call of Sky...\n|,
+      out => {
+         line_type => 'BEGIN_MEMORIZE_SPELL',
+         spell     => 'Call of Sky',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] a Bloodguard caretaker\'s casting is interrupted!\n|,
+      out => {
+         line_type => 'SPELL_INTERRUPTED',
+         caster    => 'a Bloodguard caretaker',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Your spell is interrupted.\n|,
+      out => {
+         line_type => 'SPELL_INTERRUPTED',
+         caster    => 'You',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Your spell would not have taken hold on your target.\n|,
+      out => {
+         line_type => 'SPELL_NO_HOLD',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Your target resisted the Snare spell.\n|,
+      out => {
+         line_type => 'SPELL_RESISTED',
+         spell     => 'Snare',
          },
       },
 

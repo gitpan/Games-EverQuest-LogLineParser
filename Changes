@@ -1,5 +1,16 @@
 Revision history for Perl extension Games::EverQuest::LogLineParser.
 
+0.06  11/18/03
+   - added YOU_OOC, YOU_AUCTION, YOU_SHOUT, GAME_TIME, EARTH_TIME, MAGIC_DIE,
+     ROLL_RESULT, BEGIN_MEMORIZE_SPELL, SPELL_INTERRUPTED, SPELL_NO_HOLD,
+     line types
+   - changed YOUR_SPELL_RESISTED to SPELL_RESISTED
+   - changed CRITICAL_SCORE to CRITICAL_DAMAGE (now handles spells as well as melee)
+   - eqlog_line_type_frequency.pl
+      - added option to sort by frequency
+   - eqlog_unrecognized_lines.pl script to distribution
+      - added option to output statistics regarding % recongnized and lines/second
+
 0.05  11/16/03
    - added documentation to included scripts
    - 'backstab' and 'claw' are recognized in MELEE_DAMAGE

@@ -3,6 +3,14 @@
 use strict;
 use warnings;
 
+use Getopt::Std;
+
+our ($opt_s);
+
+getopts('s');
+
+my ($rec_count, $total_count) = (0,0);
+
 use Games::EverQuest::LogLineParser;
 
 die "USAGE: perl eqlog_unrecognized_lines.pl <eqlog_file> [output_file]\n" unless @ARGV > 0;
@@ -14,11 +22,31 @@ $output_file = defined $output_file ? $output_file : '-';
 open (my $eqlog_fh,  $eqlog_file)     || die "$eqlog_file: $!";
 open (my $output_fh, ">$output_file") || die "$output_file: $!";
 
+my $start = time();
+
 while (<$eqlog_fh>)
    {
 
-   parse_eq_line($_) || print $output_fh $_;
+   $total_count++;
 
+   if (parse_eq_line($_))
+      {
+      $rec_count++;
+      }
+   else
+      {
+      print $output_fh $_;
+      }
+
+   }
+
+my $total_secs = time() - $start;;
+
+if ($opt_s)
+   {
+   my $rec_percent = 100 * $rec_count / $total_count;
+   printf STDERR "    %% recognized: %.01f ($rec_count/$total_count)\n", $rec_percent;
+   printf STDERR "lines per second: %d ($total_count/$total_secs)\n", $total_count / $total_secs;
    }
 
 close $eqlog_fh;
@@ -35,10 +63,11 @@ log file, which are unparsable by L<Games::EverQuest::LogLineParser>.
    ## output to STDOUT
    eqlog_eqlog_unrecognized_lines.pl c:\everquest\eqlog_Soandso_server.txt
 
-      or
-
    ## output to file
    eqlog_eqlog_unrecognized_lines.pl c:\everquest\eqlog_Soandso_server.txt eqlog.csv
+
+   ## output statistics
+   eqlog_eqlog_unrecognized_lines.pl -s c:\everquest\eqlog_Soandso_server.txt eqlog.csv
 
 =head1 DESCRIPTION
 
@@ -47,6 +76,19 @@ which are unparsable by L<Games::EverQuest::LogLineParser>.
 
 This is useful if in finding new line types which should be added to the
 module.
+
+=head1 OPTIONS
+
+=over 4
+
+=item C<-s> show stats on STDERR
+
+   example:
+
+          % recognized: 79.5 (686623/863465)
+      lines per second: 7380 (863465/117)
+
+=back
 
 =head1 AUTHOR
 
@@ -57,10 +99,6 @@ fooble, E<lt>fooble@cpan.orgE<gt>
 =over 4
 
 =item - show progress
-
-=item - report lines per second
-
-=item - report percent/count lines (un)recognized
 
 =back
 

@@ -3,6 +3,12 @@
 use strict;
 use warnings;
 
+use Getopt::Std;
+
+our ($opt_n);
+
+getopts('n');
+
 use Games::EverQuest::LogLineParser;
 
 die "USAGE: perl eqlog_line_type_frequency.pl <eqlog_file> [output_file]\n" unless @ARGV > 0;
@@ -28,9 +34,19 @@ close $eqlog_fh;
 
 open (my $output_fh, ">$output_file") || die "$output_file: $!";
 
-for (sort keys %freq)
+if ($opt_n)
    {
-   printf $output_fh "   %-24s => %s\n", $_, $freq{$_};
+   for (sort { $freq{$a} <=> $freq{$b} } keys %freq)
+      {
+      printf $output_fh "   %-24s => %s\n", $_, $freq{$_};
+      }
+   }
+else
+   {
+   for (sort keys %freq)
+      {
+      printf $output_fh "   %-24s => %s\n", $_, $freq{$_};
+      }
    }
 
 close $output_fh;
@@ -46,10 +62,11 @@ type in an EverQuest log file.
    ## output to STDOUT
    eqlog_line_type_frequency.pl c:\everquest\eqlog_Soandso_server.txt
 
-      or
-
    ## output to file
    eqlog_line_type_frequency.pl c:\everquest\eqlog_Soandso_server.txt eqlog.csv
+
+   ## output sorted by frequency
+   eqlog_line_type_frequency.pl -n c:\everquest\eqlog_Soandso_server.txt eqlog.csv
 
 =head1 DESCRIPTION
 
@@ -103,6 +120,14 @@ types should be tested.
    YOU_TELL_GROUP           => 4329
    YOU_TELL_OTHER           => 965
 
+
+=head1 OPTIONS
+
+=over 4
+
+=item C<-n> print sorted by number of lines
+
+=back
 
 =head1 AUTHOR
 

@@ -137,7 +137,7 @@ our @ISA = qw/ Exporter /;
 our @EXPORT = qw/ parse_eq_line parse_eq_line_type parse_eq_time_stamp
                   all_possible_line_types all_possible_keys /;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 my (@line_types, %line_types);
 
@@ -1084,7 +1084,7 @@ push @line_types,
 
    };
 
-=item YOUR_SPELL_RESISTED
+=item SPELL_RESISTED
 
    input line:
 
@@ -1093,7 +1093,7 @@ push @line_types,
    output hash ref:
 
       {
-         line_type  => 'YOUR_SPELL_RESISTED',
+         line_type  => 'SPELL_RESISTED',
          time_stamp => '[Mon Oct 13 00:42:36 2003] ',
          spell      => 'Ensnaring Roots',
       };
@@ -1112,7 +1112,7 @@ push @line_types,
       my ($spell) = @_;
       return
          {
-         line_type  => 'YOUR_SPELL_RESISTED',
+         line_type  => 'SPELL_RESISTED',
          spell      => $spell,
          };
       }
@@ -1291,6 +1291,111 @@ push @line_types,
       return
          {
          line_type  => 'YOU_SAY',
+         spoken     => $spoken,
+         };
+      }
+
+   };
+
+=item YOU_OOC
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] You say out of character, 'one potato, two potato'
+
+   output hash ref:
+
+      {
+         line_type  => 'YOU_OOC',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spoken     => 'one potato, two potato',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\AYou say out of character, '(.+)'\Z/,
+   handler => sub
+      {
+      my ($spoken) = @_;
+      return
+         {
+         line_type  => 'YOU_OOC',
+         spoken     => $spoken,
+         };
+      }
+
+   };
+
+=item YOU_SHOUT
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] You shout, 'one potato, two potato'
+
+   output hash ref:
+
+      {
+         line_type  => 'YOU_SHOUT',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spoken     => 'one potato, two potato',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\AYou shout, '(.+)'\Z/,
+   handler => sub
+      {
+      my ($spoken) = @_;
+      return
+         {
+         line_type  => 'YOU_SHOUT',
+         spoken     => $spoken,
+         };
+      }
+
+   };
+
+=item YOU_AUCTION
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] You auction, 'one potato, two potato'
+
+   output hash ref:
+
+      {
+         line_type  => 'YOU_AUCTION',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spoken     => 'one potato, two potato',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\AYou auction, '(.+)'\Z/,
+   handler => sub
+      {
+      my ($spoken) = @_;
+      return
+         {
+         line_type  => 'YOU_AUCTION',
          spoken     => $spoken,
          };
       }
@@ -1564,7 +1669,7 @@ push @line_types,
 
    };
 
-=item CRITICAL_SCORE
+=item CRITICAL_DAMAGE
 
    input line:
 
@@ -1573,11 +1678,25 @@ push @line_types,
    output hash ref:
 
       {
-         line_type  => 'CRITICAL_SCORE',
+         line_type  => 'CRITICAL_DAMAGE',
          time_stamp => '[Mon Oct 13 00:42:36 2003] ',
          attacker   => 'Soandso',
          type       => 'hit',
          amount     => '126',
+      };
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Soandso delivers a critical blast! (3526)
+
+   output hash ref:
+
+      {
+         line_type  => 'CRITICAL_DAMAGE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'Soandso',
+         type       => 'blast',
+         amount     => '3526',
       };
 
    comments:
@@ -1588,13 +1707,13 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\A(\w+) scores a critical (hit|blast)! \((\d+)\)\Z/,
+   rx      => qr/\A(\w+) (?:delivers|scores) a critical (hit|blast)! \((\d+)\)\Z/,
    handler => sub
       {
       my ($attacker, $type, $amount) = @_;
       return
          {
-         line_type  => 'CRITICAL_SCORE',
+         line_type  => 'CRITICAL_DAMAGE',
          attacker   => $attacker,
          type       => $type,
          amount     => $amount,
@@ -2014,6 +2133,267 @@ push @line_types,
 
    };
 
+=item GAME_TIME
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Game Time: Thursday, April 05, 3176 - 6 PM
+
+   output hash ref:
+
+      {
+         line_type  => 'GAME_TIME',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         time       => 'Game Time: Thursday, April 05, 3176 - 6 PM',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\AGame Time: (.+)\Z/,
+   handler => sub
+      {
+      my ($time) = @_;
+      return
+         {
+         line_type => 'GAME_TIME',
+         time      => $time,
+         };
+      }
+
+   };
+
+=item EARTH_TIME
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Earth Time: Thursday, April 05, 2003 19:25:47
+
+   output hash ref:
+
+      {
+         line_type  => 'EARTH_TIME',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         time       => 'Earth Time: Thursday, April 05, 2003 19:25:47',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\AEarth Time: (.+)\Z/,
+   handler => sub
+      {
+      my ($time) = @_;
+      return
+         {
+         line_type => 'EARTH_TIME',
+         time      => $time,
+         };
+      }
+
+   };
+
+=item MAGIC_DIE
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] **A Magic Die is rolled by Soandso.
+
+   output hash ref:
+
+      {
+         line_type  => 'MAGIC_DIE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         roller     => 'Soandso',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\A\*\*A Magic Die is rolled by (.+?)\.\Z/,
+   handler => sub
+      {
+      my ($roller) = @_;
+      return
+         {
+         line_type => 'MAGIC_DIE',
+         roller    => $roller,
+         };
+      }
+
+   };
+
+=item ROLL_RESULT
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] **It could have been any number from 0 to 550, but this time it turned up a 492.
+
+   output hash ref:
+
+      {
+         line_type  => 'ROLL_RESULT',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         min        => '0',
+         max        => '550',
+         amount     => '492',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\A\*\*It could have been any number from (\d+) to (\d+), but this time it turned up a (\d+)\.\Z/,
+   handler => sub
+      {
+      my ($min, $max, $amount) = @_;
+      return
+         {
+         line_type => 'ROLL_RESULT',
+         min       => $min,
+         max       => $max,
+         amount    => $amount,
+         };
+      }
+
+   };
+
+=item BEGIN_MEMORIZE_SPELL
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Beginning to memorize Call of Sky...
+
+   output hash ref:
+
+      {
+         line_type  => 'BEGIN_MEMORIZE_SPELL',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         min        => '0',
+         max        => '550',
+         amount     => '492',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\ABeginning to memorize (.+?)\.\.\.\Z/,
+   handler => sub
+      {
+      my ($spell) = @_;
+      return
+         {
+         line_type => 'BEGIN_MEMORIZE_SPELL',
+         spell     => $spell,
+         };
+      }
+
+   };
+
+=item SPELL_INTERRUPTED
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] a Bloodguard caretaker's casting is interrupted!
+
+   output hash ref:
+
+      {
+         line_type  => 'SPELL_INTERRUPTED',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         caster     => 'a Bloodguard caretaker',
+      };
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Your spell is interrupted.
+
+   output hash ref:
+
+      {
+         line_type  => 'SPELL_INTERRUPTED',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         caster     => 'You',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\A(.+?) (?:spell|casting) is interrupted(?:\.|!)\Z/,
+   handler => sub
+      {
+      my ($caster) = @_;
+      $caster =~ s/(?:\'s|r)\z// if defined $caster;
+      return
+         {
+         line_type => 'SPELL_INTERRUPTED',
+         caster    => $caster,
+         };
+      }
+
+   };
+
+=item SPELL_NO_HOLD
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Your spell would not have taken hold on your target.
+
+   output hash ref:
+
+      {
+         line_type  => 'SPELL_NO_HOLD',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\AYour spell would not have taken hold on your target\.\Z/,
+   handler => sub
+      {
+      return
+         {
+         line_type => 'SPELL_NO_HOLD',
+         };
+      }
+
+   };
+
 1;
 __END__
 
@@ -2039,8 +2419,7 @@ too please) for handling the offending line would be great.
 
 =item - add unrecognized yet useful lines
 
-   YOU_SHOUT, YOU_OOC, YOU_AUCTION, GAME_TIME, EARTH_TIME, MAGIC_DIE,
-   RANDOM_NUMBER, MOTD, GUILD_MOTD, BEGIN_MEMORIZE
+   MOTD, GUILD_MOTD, BEGIN_MEMORIZE
 
 =item - optimize ordering of @line_types
 
