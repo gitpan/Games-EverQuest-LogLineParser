@@ -1,5 +1,12 @@
 Revision history for Perl extension Games::EverQuest::LogLineParser.
 
+0.07  08/28/04
+   - trim all new lines and carriage returns prior to line parsing, fixes parsing
+     for those running EQ under Wine (thanks to David Frascone)
+   - added LEVEL_GAIN line type (thanks to David Frascone)
+   - moved distribution from windows to linux, and rebuilt using:
+      h2xs -AX -b 5.6.0 -n Games::EverQuest::LogLineParser --use-new-tests -v 0.7
+
 0.06  11/18/03
    - added YOU_OOC, YOU_AUCTION, YOU_SHOUT, GAME_TIME, EARTH_TIME, MAGIC_DIE,
      ROLL_RESULT, BEGIN_MEMORIZE_SPELL, SPELL_INTERRUPTED, SPELL_NO_HOLD,

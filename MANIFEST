@@ -1,9 +1,9 @@
 Changes
-LogLineParser.pm
+lib/Games/EverQuest/LogLineParser.pm
 Makefile.PL
 MANIFEST
 README
-t/test.t
+t/Games-EverQuest-LogLineParser.t
 META.yml                                 Module meta-data (added by MakeMaker)
 eqlog2csv.pl
 eqlog_line_type_frequency.pl
