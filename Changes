@@ -1,6 +1,12 @@
 Revision history for Perl extension Games::EverQuest::LogLineParser.
 
+0.02  Wed Nov 12 08:26:02 2003
+   - converted hash based implementation to array based (better control
+      of processing order, and likely faster)
+   - included eqlog2csv.pl script to distribution
+   - added 'time_stamp' and 'line_type' keys to doc examples
+
 0.01  Wed Nov  5 07:03:42 2003
-	- original version; created by h2xs 1.21 with options
-		-AX -n Games::EverQuest::LogLineParser
+   - original version; created by h2xs 1.21 with options
+      -AX -n Games::EverQuest::LogLineParser
 

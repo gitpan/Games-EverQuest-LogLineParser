@@ -1,8 +1,8 @@
-Games/EverQuest/LogLineParser version 0.01
+Games/EverQuest/LogLineParser version 0.02
 ==========================================
 
 Games::EverQuest::LogLineParser is a perl extension for parsing lines from
-the EverQuest log file. It understand a wide variety of line types, and can
+the EverQuest log file. It understands a wide variety of line types, and can
 break them down into a hash ref of easy to access information.
 
 INSTALLATION

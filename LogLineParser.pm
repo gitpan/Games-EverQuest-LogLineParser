@@ -86,9 +86,9 @@ our @ISA = qw/ Exporter /;
 
 our @EXPORT = qw/ parse_eq_line parse_eq_time_stamp all_possible_keys /;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
-my (%line_types);
+my @line_types;
 
 ## returns a parsed line hash ref if the line is understood, else false
 sub parse_eq_line
@@ -99,18 +99,17 @@ sub parse_eq_line
 
    my $time_stamp = substr($line, 0, 27, '');
 
-   for my $line_type (keys %line_types)
+   for my $line_type (@line_types)
       {
-      if (my @parts = $line =~ $line_types{$line_type}{rx})
+      if (my @parts = $line =~ $line_type->{'rx'})
          {
-         my $parsed_line = $line_types{$line_type}{handler}->(@parts);
+         my $parsed_line = $line_type->{'handler'}->(@parts);
          $parsed_line->{'time_stamp'} = $time_stamp;
-         $parsed_line->{'line_type'}  = $line_type;
          return $parsed_line;
          }
       }
 
-   return "miss";
+   return;
 
    }
 
@@ -143,32 +142,33 @@ sub all_possible_keys
 
    my %all_keys;
 
-   for my $line_type (keys %line_types)
+   for my $line_type (@line_types)
       {
-      for my $key (keys %{ $line_types{$line_type}{handler}->() })
+      for my $key (keys %{ $line_type->{'handler'}->() })
          {
          $all_keys{$key}++;
          }
       }
 
-   return ( qw/ line_type time_stamp /, sort keys %all_keys );
+   return ( sort (keys %all_keys, 'time_stamp') );
 
    }
 
 
-=item MELEE_DAMAGE
+=item MOB_HITS_YOU
 
    input line:
 
-      You slash a Bloodguard crypt sentry for 88 points of damage.
+      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry hits YOU for 161 points of damage.
 
    output hash ref:
 
       {
-         attacker => 'You',
-         attack   => 'slash',
-         attackee => 'A Bloodguard crypt sentry',
-         amount   => '88',
+         line_type  => 'MOB_HITS_YOU',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'A Bloodguard crypt sentry',
+         attack     => 'hit',
+         amount     => '161',
       };
 
    comments:
@@ -177,7 +177,49 @@ sub all_possible_keys
 
 =cut
 
-$line_types{'MELEE_DAMAGE'} =
+## needs to be before MELEE_DAMAGE
+push @line_types,
+   {
+   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul)(?:s|es) YOU for (\d+) points? of damage\.\Z/,
+   handler => sub
+      {
+      my ($attacker, $attack, $amount) = @_;
+      return
+         {
+         line_type  => 'MOB_HITS_YOU',
+         attacker   => $attacker,
+         attack     => $attack,
+         amount     => $amount,
+         };
+      }
+
+   };
+
+=item MELEE_DAMAGE
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] You slash a Bloodguard crypt sentry for 88 points of damage.
+      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry hits YOU for 161 points of damage.
+
+   output hash ref:
+
+      {
+         line_type  => 'MELEE_DAMAGE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'You',
+         attack     => 'slash',
+         attackee   => 'A Bloodguard crypt sentry',
+         amount     => '88',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
    {
    rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul)(?:s|es)? (?!by non-melee)(.+?) for (\d+) points? of damage\.\Z/,
    handler => sub
@@ -185,10 +227,11 @@ $line_types{'MELEE_DAMAGE'} =
       my ($attacker, $attack, $attackee, $amount) = @_;
       return
          {
-         attacker => ucfirst $attacker,
-         attack   => $attack,
-         attackee => ucfirst $attackee,
-         amount   => $amount,
+         line_type  => 'MELEE_DAMAGE',
+         attacker   => ucfirst $attacker,
+         attack     => $attack,
+         attackee   => ucfirst $attackee,
+         amount     => $amount,
          };
       }
 
@@ -198,13 +241,15 @@ $line_types{'MELEE_DAMAGE'} =
 
    input line:
 
-      You try to kick a Bloodguard crypt sentry, but miss!
+      [Mon Oct 13 00:42:36 2003] You try to kick a Bloodguard crypt sentry, but miss!
 
    output hash ref:
 
       {
-         attack   => 'slash',
-         attackee => 'A Bloodguard crypt sentry',
+         line_type  => 'YOU_MISS_MOB',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attack     => 'slash',
+         attackee   => 'A Bloodguard crypt sentry',
       };
 
    comments:
@@ -213,7 +258,7 @@ $line_types{'MELEE_DAMAGE'} =
 
 =cut
 
-$line_types{'YOU_MISS_MOB'} =
+push @line_types,
    {
    rx      => qr/\AYou try to (\w+) (.+?), but miss!\Z/,
    handler => sub
@@ -221,59 +266,26 @@ $line_types{'YOU_MISS_MOB'} =
       my ($attack, $attackee) = @_;
       return
          {
-         attack   => $attack,
-         attackee => ucfirst $attackee,
+         line_type  => 'YOU_MISS_MOB',
+         attack     => $attack,
+         attackee   => ucfirst $attackee,
          };
       }
-   };
-
-=item MOB_HITS_YOU
-
-   input line:
-
-      A Bloodguard crypt sentry hits YOU for 161 points of damage.
-
-   output hash ref:
-
-      {
-         attacker => 'A Bloodguard crypt sentry',
-         attack   => 'hit',
-         amount   => '161',
-      };
-
-   comments:
-
-      none
-
-=cut
-
-$line_types{'MOB_HITS_YOU'} =
-   {
-   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul)(?:s|es) YOU for (\d+) points? of damage\.\Z/,
-   handler => sub
-      {
-      my ($attacker, $attack, $amount) = @_;
-      return
-         {
-         attacker => $attacker,
-         attack   => $attack,
-         amount   => $amount,
-         };
-      }
-
    };
 
 =item MOB_MISSES_YOU
 
    input line:
 
-      A Bloodguard crypt sentry tries to hit YOU, but misses!
+      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry tries to hit YOU, but misses!
 
    output hash ref:
 
       {
-         attacker => 'A Bloodguard crypt sentry',
-         attack   => 'hit',
+         line_type  => 'MOB_MISSES_YOU',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'A Bloodguard crypt sentry',
+         attack     => 'hit',
       };
 
    comments:
@@ -282,7 +294,7 @@ $line_types{'MOB_HITS_YOU'} =
 
 =cut
 
-$line_types{'MOB_MISSES_YOU'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) tries to (\w+) YOU, but misses!\Z/,
    handler => sub
@@ -290,8 +302,9 @@ $line_types{'MOB_MISSES_YOU'} =
       my ($attacker, $attack) = @_;
       return
          {
-         attacker => $attacker,
-         attack   => $attack,
+         line_type  => 'MOB_MISSES_YOU',
+         attacker   => $attacker,
+         attack     => $attack,
          };
       }
    };
@@ -300,11 +313,13 @@ $line_types{'MOB_MISSES_YOU'} =
 
    input line:
 
-      Your faction standing with Loyals got worse.
+      [Mon Oct 13 00:42:36 2003] Your faction standing with Loyals got worse.
 
    output hash ref:
 
       {
+         line_type      => 'FACTION_HIT',
+         time_stamp     => '[Mon Oct 13 00:42:36 2003] ',
          faction_group  => 'Loyals',
          faction_change => 'worse',
       };
@@ -315,7 +330,7 @@ $line_types{'MOB_MISSES_YOU'} =
 
 =cut
 
-$line_types{'FACTION_HIT'} =
+push @line_types,
    {
    rx      => qr/\AYour faction standing with (.+?) got (better|worse)\.\Z/,
    handler => sub
@@ -323,6 +338,7 @@ $line_types{'FACTION_HIT'} =
       my ($faction_group, $faction_change) = @_;
       return
          {
+         line_type      => 'FACTION_HIT',
          faction_group  => $faction_group,
          faction_change => $faction_change,
          };
@@ -334,14 +350,16 @@ $line_types{'FACTION_HIT'} =
 
    input line:
 
-      A Bloodguard crypt sentry tries to hit YOU, but YOU parry!
+      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry tries to hit YOU, but YOU parry!
 
    output hash ref:
 
       {
-         attacker => 'A Bloodguard crypt sentry',
-         attack   => 'hit',
-         repel    => 'parry',
+         line_type  => 'YOU_REPEL_HIT',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'A Bloodguard crypt sentry',
+         attack     => 'hit',
+         repel      => 'parry',
       };
 
    comments:
@@ -350,7 +368,7 @@ $line_types{'FACTION_HIT'} =
 
 =cut
 
-$line_types{'YOU_REPEL_HIT'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) tries to (\w+) YOU, but YOU (\w+)!\Z/,
    handler => sub
@@ -358,9 +376,10 @@ $line_types{'YOU_REPEL_HIT'} =
       my ($attacker, $attack, $repel) = @_;
       return
          {
-         attacker => $attacker,
-         attack   => $attack,
-         repel    => $repel,
+         line_type  => 'YOU_REPEL_HIT',
+         attacker   => $attacker,
+         attack     => $attack,
+         repel      => $repel,
          };
       }
 
@@ -370,14 +389,16 @@ $line_types{'YOU_REPEL_HIT'} =
 
    input line:
 
-      You try to slash a Bloodguard crypt sentry, but a Bloodguard crypt sentry ripostes!
+      [Mon Oct 13 00:42:36 2003] You try to slash a Bloodguard crypt sentry, but a Bloodguard crypt sentry ripostes!
 
    output hash ref:
 
       {
-         attack   => 'slash',
-         attackee => 'A Bloodguard crypt sentry',
-         repel    => 'riposte',
+         line_type  => 'MOB_REPELS_HIT',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attack     => 'slash',
+         attackee   => 'A Bloodguard crypt sentry',
+         repel      => 'riposte',
       };
 
    comments:
@@ -386,7 +407,7 @@ $line_types{'YOU_REPEL_HIT'} =
 
 =cut
 
-$line_types{'MOB_REPELS_HIT'} =
+push @line_types,
    {
    rx      => qr/\AYou try to (\w+) (.+?), but \2 (\w+)s!\Z/,
    handler => sub
@@ -396,9 +417,10 @@ $line_types{'MOB_REPELS_HIT'} =
       $repel = 'parry' if $repel eq 'parrie';
       return
          {
-         attack   => $attack,
-         attackee => ucfirst $attackee,
-         repel    => $repel,
+         line_type  => 'MOB_REPELS_HIT',
+         attack     => $attack,
+         attackee   => ucfirst $attackee,
+         repel      => $repel,
          };
       }
 
@@ -408,12 +430,14 @@ $line_types{'MOB_REPELS_HIT'} =
 
    input line:
 
-      You have slain a Bloodguard crypt sentry!
+      [Mon Oct 13 00:42:36 2003] You have slain a Bloodguard crypt sentry!
 
    output hash ref:
 
       {
-         slayee => 'A Bloodguard crypt sentry',
+         line_type  => 'SLAIN_BY_YOU',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         slayee     => 'A Bloodguard crypt sentry',
       };
 
    comments:
@@ -422,7 +446,7 @@ $line_types{'MOB_REPELS_HIT'} =
 
 =cut
 
-$line_types{'SLAIN_BY_YOU'} =
+push @line_types,
    {
    rx      => qr/\AYou have slain (.+?)!\Z/,
    handler => sub
@@ -430,7 +454,8 @@ $line_types{'SLAIN_BY_YOU'} =
       my ($slayee) = @_;
       return
          {
-         slayee => ucfirst $slayee,
+         line_type  => 'SLAIN_BY_YOU',
+         slayee     => ucfirst $slayee,
          };
       }
 
@@ -440,11 +465,13 @@ $line_types{'SLAIN_BY_YOU'} =
 
    input line:
 
-      You have become better at Abjuration! (222)
+      [Mon Oct 13 00:42:36 2003] You have become better at Abjuration! (222)
 
    output hash ref:
 
       {
+         line_type   => 'SKILL_UP',
+         time_stamp  => '[Mon Oct 13 00:42:36 2003] ',
          skill_upped => 'Abjuration',
          skill_value => '222',
       };
@@ -455,7 +482,7 @@ $line_types{'SLAIN_BY_YOU'} =
 
 =cut
 
-$line_types{'SKILL_UP'} =
+push @line_types,
    {
    rx      => qr/\AYou have become better at (.+?)! \((\d+)\)\Z/,
    handler => sub
@@ -463,6 +490,7 @@ $line_types{'SKILL_UP'} =
       my ($skill_upped, $skill_value) = @_;
       return
          {
+         line_type   => 'SKILL_UP',
          skill_upped => $skill_upped,
          skill_value => $skill_value,
          };
@@ -474,13 +502,15 @@ $line_types{'SKILL_UP'} =
 
    input line:
 
-      a Bloodguard crypt sentry has been slain by Soandso!
+      [Mon Oct 13 00:42:36 2003] a Bloodguard crypt sentry has been slain by Soandso!
 
    output hash ref:
 
       {
-         slayee => 'A Bloodguard crypt sentry',
-         slayer => 'Soandso',
+         line_type  => 'SLAIN_BY_OTHER',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         slayee     => 'A Bloodguard crypt sentry',
+         slayer     => 'Soandso',
       };
 
    comments:
@@ -489,7 +519,7 @@ $line_types{'SKILL_UP'} =
 
 =cut
 
-$line_types{'SLAIN_BY_OTHER'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) has been slain by (.+?)!\Z/,
    handler => sub
@@ -497,8 +527,9 @@ $line_types{'SLAIN_BY_OTHER'} =
       my ($slayee, $slayer) = @_;
       return
          {
-         slayee => ucfirst $slayee,
-         slayer => $slayer,
+         line_type  => 'SLAIN_BY_OTHER',
+         slayee     => ucfirst $slayee,
+         slayer     => $slayer,
          };
       }
 
@@ -508,15 +539,17 @@ $line_types{'SLAIN_BY_OTHER'} =
 
    input line:
 
-      You receive 67 platinum, 16 gold, 20 silver and 36 copper from the corpse.
+      [Mon Oct 13 00:42:36 2003] You receive 67 platinum, 16 gold, 20 silver and 36 copper from the corpse.
 
    output hash ref:
 
       {
-         platinum  => '67',
-         gold      => '16',
-         silver    => '20',
-         copper    => '36',
+         line_type  => 'CORPSE_MONEY',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         platinum   => '67',
+         gold       => '16',
+         silver     => '20',
+         copper     => '36',
       };
 
    comments:
@@ -525,7 +558,7 @@ $line_types{'SLAIN_BY_OTHER'} =
 
 =cut
 
-$line_types{'CORPSE_MONEY'} =
+push @line_types,
    {
    rx      => qr/\AYou receive (.+?)from the corpse\.\Z/,
    handler => sub
@@ -536,10 +569,11 @@ $line_types{'CORPSE_MONEY'} =
       my %moneys = reverse split '[ ,]+', $money;
       return
          {
-         platinum  => $moneys{'platinum'} || 0,
-         gold      => $moneys{'gold'}     || 0,
-         silver    => $moneys{'silver'}   || 0,
-         copper    => $moneys{'copper'}   || 0,
+         line_type  => 'CORPSE_MONEY',
+         platinum   => $moneys{'platinum'} || 0,
+         gold       => $moneys{'gold'}     || 0,
+         silver     => $moneys{'silver'}   || 0,
+         copper     => $moneys{'copper'}   || 0,
          };
       }
 
@@ -549,13 +583,15 @@ $line_types{'CORPSE_MONEY'} =
 
    input line:
 
-      a Bloodguard crypt sentry was hit by non-melee for 8 points of damage.
+      [Mon Oct 13 00:42:36 2003] a Bloodguard crypt sentry was hit by non-melee for 8 points of damage.
 
    output hash ref:
 
       {
-         attacker => 'A Bloodguard crypt sentry',
-         amount   => '8',
+         line_type  => 'DAMAGE_SHIELD',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'A Bloodguard crypt sentry',
+         amount     => '8',
       };
 
    comments:
@@ -564,7 +600,7 @@ $line_types{'CORPSE_MONEY'} =
 
 =cut
 
-$line_types{'DAMAGE_SHIELD'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) was hit by non-melee for (\d+) points? of damage\.\Z/,
    handler => sub
@@ -572,8 +608,9 @@ $line_types{'DAMAGE_SHIELD'} =
       my ($attacker, $amount) = @_;
       return
          {
-         attacker => ucfirst $attacker,
-         amount   => $amount,
+         line_type  => 'DAMAGE_SHIELD',
+         attacker   => ucfirst $attacker,
+         amount     => $amount,
          };
       }
 
@@ -583,14 +620,16 @@ $line_types{'DAMAGE_SHIELD'} =
 
    input line:
 
-      Soandso hit a Bloodguard crypt sentry for 300 points of non-melee damage.
+      [Mon Oct 13 00:42:36 2003] Soandso hit a Bloodguard crypt sentry for 300 points of non-melee damage.
 
    output hash ref:
 
       {
-         attacker => 'Soandso',
-         attackee => 'A Bloodguard crypt sentry',
-         amount   => '300',
+         line_type  => 'DIRECT_DAMAGE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'Soandso',
+         attackee   => 'A Bloodguard crypt sentry',
+         amount     => '300',
       };
 
    comments:
@@ -599,7 +638,7 @@ $line_types{'DAMAGE_SHIELD'} =
 
 =cut
 
-$line_types{'DIRECT_DAMAGE'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) hit (.+?) for (\d+) points? of non-melee damage\.\Z/,
    handler => sub
@@ -607,9 +646,10 @@ $line_types{'DIRECT_DAMAGE'} =
       my ($attacker, $attackee, $amount) = @_;
       return
          {
-         attacker => $attacker,
-         attackee => ucfirst $attackee,
-         amount   => $amount,
+         line_type  => 'DIRECT_DAMAGE',
+         attacker   => $attacker,
+         attackee   => ucfirst $attackee,
+         amount     => $amount,
          };
       }
 
@@ -619,14 +659,16 @@ $line_types{'DIRECT_DAMAGE'} =
 
    input line:
 
-      A Bloodguard crypt sentry has taken 3 damage from your Flame Lick.
+      [Mon Oct 13 00:42:36 2003] A Bloodguard crypt sentry has taken 3 damage from your Flame Lick.
 
    output hash ref:
 
       {
-         attackee => 'A Bloodguard crypt sentry',
-         amount   => '3',
-         spell    => 'Flame Lick',
+         line_type  => 'DAMAGE_OVER_TIME',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attackee   => 'A Bloodguard crypt sentry',
+         amount     => '3',
+         spell      => 'Flame Lick',
       };
 
    comments:
@@ -635,7 +677,7 @@ $line_types{'DIRECT_DAMAGE'} =
 
 =cut
 
-$line_types{'DAMAGE_OVER_TIME'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) has taken (\d+) damage from your (.+?)\.\Z/,
    handler => sub
@@ -643,9 +685,10 @@ $line_types{'DAMAGE_OVER_TIME'} =
       my ($attackee, $amount, $spell) = @_;
       return
          {
-         attackee => $attackee,
-         amount   => $amount,
-         spell    => $spell,
+         line_type  => 'DAMAGE_OVER_TIME',
+         attackee   => $attackee,
+         amount     => $amount,
+         spell      => $spell,
          };
       }
 
@@ -655,24 +698,28 @@ $line_types{'DAMAGE_OVER_TIME'} =
 
    input line:
 
-      --You have looted a Flawed Green Shard of Might.--
+      [Mon Oct 13 00:42:36 2003] --You have looted a Flawed Green Shard of Might.--
 
    output hash ref:
 
       {
-         looter => 'You',
-         item   => 'Flawed Green Shard of Might',
+         line_type  => 'LOOT_ITEM',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         looter     => 'You',
+         item       => 'Flawed Green Shard of Might',
       };
 
    input line:
 
-      --Soandso has looted a Tears of Prexus.--
+      [Mon Oct 13 00:42:36 2003] --Soandso has looted a Tears of Prexus.--
 
    output hash ref:
 
       {
-         looter => 'Soandso',
-         item   => 'Tears of Prexus',
+         line_type  => 'LOOT_ITEM',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         looter     => 'Soandso',
+         item       => 'Tears of Prexus',
       };
 
    comments:
@@ -681,7 +728,7 @@ $line_types{'DAMAGE_OVER_TIME'} =
 
 =cut
 
-$line_types{'LOOT_ITEM'} =
+push @line_types,
    {
    rx      => qr/\A--(\S+) (?:has|have) looted a (.+?)\.--\Z/,
    handler => sub
@@ -689,8 +736,9 @@ $line_types{'LOOT_ITEM'} =
       my ($looter, $item) = @_;
       return
          {
-         looter => $looter,
-         item   => $item,
+         line_type  => 'LOOT_ITEM',
+         looter     => $looter,
+         item       => $item,
          };
       }
 
@@ -700,16 +748,18 @@ $line_types{'LOOT_ITEM'} =
 
    input line:
 
-      You give 1 gold 2 silver 5 copper to Cavalier Aodus.
+      [Mon Oct 13 00:42:36 2003] You give 1 gold 2 silver 5 copper to Cavalier Aodus.
 
    output hash ref:
 
       {
-         platinum  => 0,
-         gold      => '1',
-         silver    => '2',
-         copper    => '4',
-         merchant  => 'Cavalier Aodus',
+         line_type  => 'BUY_ITEM',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         platinum   => 0,
+         gold       => '1',
+         silver     => '2',
+         copper     => '4',
+         merchant   => 'Cavalier Aodus',
       };
 
    comments:
@@ -718,7 +768,7 @@ $line_types{'LOOT_ITEM'} =
 
 =cut
 
-$line_types{'BUY_ITEM'} =
+push @line_types,
    {
    rx      => qr/\AYou give (.+?) to (.+?)\.\Z/,
    handler => sub
@@ -728,11 +778,12 @@ $line_types{'BUY_ITEM'} =
       my %moneys = reverse split ' ', $money;
       return
          {
-         platinum  => $moneys{'platinum'} || 0,
-         gold      => $moneys{'gold'}     || 0,
-         silver    => $moneys{'silver'}   || 0,
-         copper    => $moneys{'copper'}   || 0,
-         merchant  => ucfirst $merchant,
+         line_type  => 'BUY_ITEM',
+         platinum   => $moneys{'platinum'} || 0,
+         gold       => $moneys{'gold'}     || 0,
+         silver     => $moneys{'silver'}   || 0,
+         copper     => $moneys{'copper'}   || 0,
+         merchant   => ucfirst $merchant,
          };
       }
 
@@ -742,12 +793,14 @@ $line_types{'BUY_ITEM'} =
 
    input line:
 
-      You have entered The Greater Faydark.
+      [Mon Oct 13 00:42:36 2003] You have entered The Greater Faydark.
 
    output hash ref:
 
       {
-         zone => 'The Greater Faydark',
+         line_type  => 'ENTERED_ZONE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         zone       => 'The Greater Faydark',
       };
 
    comments:
@@ -756,7 +809,7 @@ $line_types{'BUY_ITEM'} =
 
 =cut
 
-$line_types{'ENTERED_ZONE'} =
+push @line_types,
    {
    rx      => qr/\AYou have entered (.+?)\.\Z/,
    handler => sub
@@ -764,7 +817,8 @@ $line_types{'ENTERED_ZONE'} =
       my ($zone) = @_;
       return
          {
-         zone => $zone,
+         line_type  => 'ENTERED_ZONE',
+         zone       => $zone,
          };
       }
 
@@ -774,17 +828,19 @@ $line_types{'ENTERED_ZONE'} =
 
    input line:
 
-      You receive 120 platinum from Magus Delin for the Fire Emerald Ring(s).
+      [Mon Oct 13 00:42:36 2003] You receive 120 platinum from Magus Delin for the Fire Emerald Ring(s).
 
    output hash ref:
 
       {
-         platinum  => '120',
-         gold      => 0,
-         silver    => 0,
-         copper    => 0,
-         merchant  => 'Magus Delin',
-         item      => 'Fire Emerald Ring',
+         line_type  => 'SELL_ITEM',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         platinum   => '120',
+         gold       => 0,
+         silver     => 0,
+         copper     => 0,
+         merchant   => 'Magus Delin',
+         item       => 'Fire Emerald Ring',
       };
 
    comments:
@@ -793,7 +849,7 @@ $line_types{'ENTERED_ZONE'} =
 
 =cut
 
-$line_types{'SELL_ITEM'} =
+push @line_types,
    {
    rx      => qr/\AYou receive (.+?) from (.+?) for the (.+?)\(s\)\.\Z/,
    handler => sub
@@ -803,12 +859,13 @@ $line_types{'SELL_ITEM'} =
       my %moneys = reverse split ' ', $money;
       return
          {
-         platinum  => $moneys{'platinum'} || 0,
-         gold      => $moneys{'gold'}     || 0,
-         silver    => $moneys{'silver'}   || 0,
-         copper    => $moneys{'copper'}   || 0,
-         merchant  => $merchant,
-         item      => $item,
+         line_type  => 'SELL_ITEM',
+         platinum   => $moneys{'platinum'} || 0,
+         gold       => $moneys{'gold'}     || 0,
+         silver     => $moneys{'silver'}   || 0,
+         copper     => $moneys{'copper'}   || 0,
+         merchant   => $merchant,
+         item       => $item,
          };
       }
    };
@@ -817,15 +874,17 @@ $line_types{'SELL_ITEM'} =
 
    input line:
 
-      You receive 163 platinum, 30 gold, 25 silver and 33 copper as your split.
+      [Mon Oct 13 00:42:36 2003] You receive 163 platinum, 30 gold, 25 silver and 33 copper as your split.
 
    output hash ref:
 
       {
-         platinum  => '163',
-         gold      => '30',
-         silver    => '25',
-         copper    => '33',
+         line_type  => 'SPLIT_MONEY',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         platinum   => '163',
+         gold       => '30',
+         silver     => '25',
+         copper     => '33',
       };
 
    comments:
@@ -834,7 +893,7 @@ $line_types{'SELL_ITEM'} =
 
 =cut
 
-$line_types{'SPLIT_MONEY'} =
+push @line_types,
    {
    rx      => qr/\AYou receive (.+?) as your split\.\Z/,
    handler => sub
@@ -845,25 +904,28 @@ $line_types{'SPLIT_MONEY'} =
       my %moneys = reverse split '[ ,]+', $money;
       return
          {
-         platinum  => $moneys{'platinum'} || 0,
-         gold      => $moneys{'gold'}     || 0,
-         silver    => $moneys{'silver'}   || 0,
-         copper    => $moneys{'copper'}   || 0,
+         line_type  => 'SPLIT_MONEY',
+         platinum   => $moneys{'platinum'} || 0,
+         gold       => $moneys{'gold'}     || 0,
+         silver     => $moneys{'silver'}   || 0,
+         copper     => $moneys{'copper'}   || 0,
          };
       }
 
    };
 
-=item SPLIT_MONEY
+=item YOU_SLAIN
 
    input line:
 
-      You have been slain by a Bloodguard crypt sentry!
+      [Mon Oct 13 00:42:36 2003] You have been slain by a Bloodguard crypt sentry!
 
    output hash ref:
 
       {
-         slayer => 'A Bloodguard crypt sentry',
+         line_type  => 'YOU_SLAIN',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         slayer     => 'A Bloodguard crypt sentry',
       };
 
    comments:
@@ -872,7 +934,7 @@ $line_types{'SPLIT_MONEY'} =
 
 =cut
 
-$line_types{'YOU_SLAIN'} =
+push @line_types,
    {
    rx      => qr/\AYou have been slain by (.+?)!\Z/,
    handler => sub
@@ -880,7 +942,8 @@ $line_types{'YOU_SLAIN'} =
       my ($slayer) = @_;
       return
          {
-         slayer => ucfirst $slayer,
+         line_type  => 'YOU_SLAIN',
+         slayer     => ucfirst $slayer,
          };
       }
 
@@ -890,12 +953,14 @@ $line_types{'YOU_SLAIN'} =
 
    input line:
 
-      You begin tracking a Bloodguard crypt sentry.
+      [Mon Oct 13 00:42:36 2003] You begin tracking a Bloodguard crypt sentry.
 
    output hash ref:
 
       {
-         trackee => 'A Bloodguard crypt sentry',
+         line_type  => 'TRACKING_MOB',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         trackee    => 'A Bloodguard crypt sentry',
       };
 
    comments:
@@ -904,7 +969,7 @@ $line_types{'YOU_SLAIN'} =
 
 =cut
 
-$line_types{'TRACKING_MOB'} =
+push @line_types,
    {
    rx      => qr/\AYou begin tracking (.+?)\.\Z/,
    handler => sub
@@ -912,7 +977,8 @@ $line_types{'TRACKING_MOB'} =
       my ($trackee) = @_;
       return
          {
-         trackee => ucfirst $trackee,
+         line_type  => 'TRACKING_MOB',
+         trackee    => ucfirst $trackee,
          };
       }
 
@@ -922,12 +988,14 @@ $line_types{'TRACKING_MOB'} =
 
    input line:
 
-      You begin casting Ensnaring Roots.
+      [Mon Oct 13 00:42:36 2003] You begin casting Ensnaring Roots.
 
    output hash ref:
 
       {
-         spell => 'Ensnaring Roots',
+         line_type  => 'YOU_CAST',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spell      => 'Ensnaring Roots',
       };
 
    comments:
@@ -936,7 +1004,7 @@ $line_types{'TRACKING_MOB'} =
 
 =cut
 
-$line_types{'YOU_CAST'} =
+push @line_types,
    {
    rx      => qr/\AYou begin casting (.+?)\.\Z/,
    handler => sub
@@ -944,7 +1012,8 @@ $line_types{'YOU_CAST'} =
       my ($spell) = @_;
       return
          {
-         spell => $spell,
+         line_type  => 'YOU_CAST',
+         spell      => $spell,
          };
       }
 
@@ -954,12 +1023,14 @@ $line_types{'YOU_CAST'} =
 
    input line:
 
-      Your target resisted the Ensnaring Roots spell.
+      [Mon Oct 13 00:42:36 2003] Your target resisted the Ensnaring Roots spell.
 
    output hash ref:
 
       {
-         spell => 'Ensnaring Roots',
+         line_type  => 'YOUR_SPELL_RESISTED',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spell      => 'Ensnaring Roots',
       };
 
    comments:
@@ -968,7 +1039,7 @@ $line_types{'YOU_CAST'} =
 
 =cut
 
-$line_types{'YOUR_SPELL_RESISTED'} =
+push @line_types,
    {
    rx      => qr/\AYour target resisted the (.+?) spell\.\Z/,
    handler => sub
@@ -976,7 +1047,8 @@ $line_types{'YOUR_SPELL_RESISTED'} =
       my ($spell) = @_;
       return
          {
-         spell => $spell,
+         line_type  => 'YOUR_SPELL_RESISTED',
+         spell      => $spell,
          };
       }
 
@@ -986,12 +1058,14 @@ $line_types{'YOUR_SPELL_RESISTED'} =
 
    input line:
 
-      You forget Ensnaring Roots.
+      [Mon Oct 13 00:42:36 2003] You forget Ensnaring Roots.
 
    output hash ref:
 
       {
-         spell => 'Ensnaring Roots',
+         line_type  => 'FORGET_SPELL',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spell      => 'Ensnaring Roots',
       };
 
    comments:
@@ -1000,7 +1074,7 @@ $line_types{'YOUR_SPELL_RESISTED'} =
 
 =cut
 
-$line_types{'FORGET_SPELL'} =
+push @line_types,
    {
    rx      => qr/\AYou forget (.+?)\.\Z/,
    handler => sub
@@ -1008,7 +1082,8 @@ $line_types{'FORGET_SPELL'} =
       my ($spell) = @_;
       return
          {
-         spell => $spell,
+         line_type  => 'FORGET_SPELL',
+         spell      => $spell,
          };
       }
 
@@ -1018,12 +1093,14 @@ $line_types{'FORGET_SPELL'} =
 
    input line:
 
-      You have finished memorizing Ensnaring Roots.
+      [Mon Oct 13 00:42:36 2003] You have finished memorizing Ensnaring Roots.
 
    output hash ref:
 
       {
-         spell => 'Ensnaring Roots',
+         line_type  => 'MEMORIZE_SPELL',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spell      => 'Ensnaring Roots',
       };
 
    comments:
@@ -1032,7 +1109,7 @@ $line_types{'FORGET_SPELL'} =
 
 =cut
 
-$line_types{'MEMORIZE_SPELL'} =
+push @line_types,
    {
    rx      => qr/\AYou have finished memorizing (.+?)\.\Z/,
    handler => sub
@@ -1040,7 +1117,8 @@ $line_types{'MEMORIZE_SPELL'} =
       my ($spell) = @_;
       return
          {
-         spell => $spell,
+         line_type  => 'MEMORIZE_SPELL',
+         spell      => $spell,
          };
       }
 
@@ -1050,11 +1128,13 @@ $line_types{'MEMORIZE_SPELL'} =
 
    input line:
 
-      Your spell fizzles!
+      [Mon Oct 13 00:42:36 2003] Your spell fizzles!
 
    output hash ref:
 
       {
+         line_type  => 'YOU_FIZZLE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
       };
 
    comments:
@@ -1063,13 +1143,14 @@ $line_types{'MEMORIZE_SPELL'} =
 
 =cut
 
-$line_types{'YOU_FIZZLE'} =
+push @line_types,
    {
    rx      => qr/\AYour spell fizzles!\Z/,
    handler => sub
       {
       return
          {
+         line_type  => 'YOU_FIZZLE',
          };
       }
 
@@ -1079,14 +1160,16 @@ $line_types{'YOU_FIZZLE'} =
 
    input line:
 
-      Your Location is -63.20, 3846.55, -42.76
+      [Mon Oct 13 00:42:36 2003] Your Location is -63.20, 3846.55, -42.76
 
    output hash ref:
 
       {
-         coord_1 => '-63.20',
-         coord_2 => '3846.55',
-         coord_3 => '-42.76',
+         line_type  => 'LOCATION',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         coord_1    => '-63.20',
+         coord_2    => '3846.55',
+         coord_3    => '-42.76',
       };
 
    comments:
@@ -1095,7 +1178,7 @@ $line_types{'YOU_FIZZLE'} =
 
 =cut
 
-$line_types{'LOCATION'} =
+push @line_types,
    {
    rx      => qr/\AYour Location is (.+?)\Z/,
    handler => sub
@@ -1105,9 +1188,10 @@ $line_types{'LOCATION'} =
       my @coords = split /[\s,]+/, $location_coords;
       return
          {
-         coord_1 => $coords[0],
-         coord_2 => $coords[1],
-         coord_3 => $coords[2],
+         line_type  => 'LOCATION',
+         coord_1    => $coords[0],
+         coord_2    => $coords[1],
+         coord_3    => $coords[2],
          };
       }
 
@@ -1117,12 +1201,14 @@ $line_types{'LOCATION'} =
 
    input line:
 
-      You tell your party, 'can you say /pet get lost'
+      [Mon Oct 13 00:42:36 2003] You tell your party, 'can you say /pet get lost'
 
    output hash ref:
 
       {
-         spoken => 'can you say /pet get lost',
+         line_type  => 'YOU_SAY',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spoken     => 'can you say /pet get lost',
       };
 
    comments:
@@ -1131,7 +1217,7 @@ $line_types{'LOCATION'} =
 
 =cut
 
-$line_types{'YOU_SAY'} =
+push @line_types,
    {
    rx      => qr/\AYour say, '(.+)'\Z/,
    handler => sub
@@ -1139,7 +1225,8 @@ $line_types{'YOU_SAY'} =
       my ($spoken) = @_;
       return
          {
-         spoken => $spoken,
+         line_type  => 'YOU_SAY',
+         spoken     => $spoken,
          };
       }
 
@@ -1149,13 +1236,15 @@ $line_types{'YOU_SAY'} =
 
    input line:
 
-      Soandso says, 'I aim to please :)'
+      [Mon Oct 13 00:42:36 2003] Soandso says, 'I aim to please :)'
 
    output hash ref:
 
       {
-         speaker => 'Soandso',
-         spoken  => 'I aim to please :)',
+         line_type  => 'OTHER_SAYS',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speaker    => 'Soandso',
+         spoken     => 'I aim to please :)',
       };
 
    comments:
@@ -1164,7 +1253,7 @@ $line_types{'YOU_SAY'} =
 
 =cut
 
-$line_types{'OTHER_SAYS'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) says,? '(.+)'\Z/,
    handler => sub
@@ -1172,8 +1261,9 @@ $line_types{'OTHER_SAYS'} =
       my ($speaker, $spoken) = @_;
       return
          {
-         speaker => $speaker,
-         spoken  => $spoken,
+         line_type  => 'OTHER_SAYS',
+         speaker    => $speaker,
+         spoken     => $spoken,
          };
       }
 
@@ -1183,13 +1273,15 @@ $line_types{'OTHER_SAYS'} =
 
    input line:
 
-      You told Soandso, 'lol, i was waiting for that =)'
+      [Mon Oct 13 00:42:36 2003] You told Soandso, 'lol, i was waiting for that =)'
 
    output hash ref:
 
       {
-         speakee => 'Soandso',
-         spoken  => 'lol, i was waiting for that =)',
+         line_type  => 'YOU_TELL_OTHER',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speakee    => 'Soandso',
+         spoken     => 'lol, i was waiting for that =)',
       };
 
    comments:
@@ -1198,7 +1290,7 @@ $line_types{'OTHER_SAYS'} =
 
 =cut
 
-$line_types{'YOU_TELL_OTHER'} =
+push @line_types,
    {
    rx      => qr/\AYou told (\w+), '(.+)'\Z/,
    handler => sub
@@ -1206,8 +1298,9 @@ $line_types{'YOU_TELL_OTHER'} =
       my ($speakee, $spoken) = @_;
       return
          {
-         speakee => $speakee,
-         spoken  => $spoken,
+         line_type  => 'YOU_TELL_OTHER',
+         speakee    => $speakee,
+         spoken     => $spoken,
          };
       }
 
@@ -1217,13 +1310,15 @@ $line_types{'YOU_TELL_OTHER'} =
 
    input line:
 
-      Soandso tells you, 'hows the adv?'
+      [Mon Oct 13 00:42:36 2003] Soandso tells you, 'hows the adv?'
 
    output hash ref:
 
       {
-         speaker => 'Soandso',
-         spoken  => 'hows the adv?',
+         line_type  => 'OTHER_TELLS_YOU',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speaker    => 'Soandso',
+         spoken     => 'hows the adv?',
       };
 
    comments:
@@ -1232,7 +1327,7 @@ $line_types{'YOU_TELL_OTHER'} =
 
 =cut
 
-$line_types{'OTHER_TELLS_YOU'} =
+push @line_types,
    {
    rx      => qr/\A(\w+) tells you, '(.+)'\Z/,
    handler => sub
@@ -1240,8 +1335,9 @@ $line_types{'OTHER_TELLS_YOU'} =
       my ($speaker, $spoken) = @_;
       return
          {
-         speaker => $speaker,
-         spoken  => $spoken,
+         line_type  => 'OTHER_TELLS_YOU',
+         speaker    => $speaker,
+         spoken     => $spoken,
          };
       }
 
@@ -1251,12 +1347,14 @@ $line_types{'OTHER_TELLS_YOU'} =
 
    input line:
 
-      You tell your party, 'will keep an eye out'
+      [Mon Oct 13 00:42:36 2003] You tell your party, 'will keep an eye out'
 
    output hash ref:
 
       {
-         spoken => 'will keep an eye out',
+         line_type  => 'YOU_TELL_GROUP',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spoken     => 'will keep an eye out',
       };
 
    comments:
@@ -1265,7 +1363,7 @@ $line_types{'OTHER_TELLS_YOU'} =
 
 =cut
 
-$line_types{'YOU_TELL_GROUP'} =
+push @line_types,
    {
    rx      => qr/\AYou tell your party, '(.+)'\Z/,
    handler => sub
@@ -1273,7 +1371,8 @@ $line_types{'YOU_TELL_GROUP'} =
       my ($spoken) = @_;
       return
          {
-         spoken => $spoken,
+         line_type  => 'YOU_TELL_GROUP',
+         spoken     => $spoken,
          };
       }
 
@@ -1283,13 +1382,15 @@ $line_types{'YOU_TELL_GROUP'} =
 
    input line:
 
-      Soandso tells the group, 'Didnt know that, thanks info'
+      [Mon Oct 13 00:42:36 2003] Soandso tells the group, 'Didnt know that, thanks info'
 
    output hash ref:
 
       {
-         speaker => 'Soandso',
-         spoken  => 'Didnt know that, thanks info',
+         line_type  => 'OTHER_TELLS_GROUP',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speaker    => 'Soandso',
+         spoken     => 'Didnt know that, thanks info',
       };
 
    comments:
@@ -1298,7 +1399,7 @@ $line_types{'YOU_TELL_GROUP'} =
 
 =cut
 
-$line_types{'OTHER_TELLS_GROUP'} =
+push @line_types,
    {
    rx      => qr/\A(\w+) tells the group, '(.+)'\Z/,
    handler => sub
@@ -1306,8 +1407,9 @@ $line_types{'OTHER_TELLS_GROUP'} =
       my ($speaker, $spoken) = @_;
       return
          {
-         speaker => $speaker,
-         spoken  => $spoken,
+         line_type  => 'OTHER_TELLS_GROUP',
+         speaker    => $speaker,
+         spoken     => $spoken,
          };
       }
 
@@ -1317,12 +1419,14 @@ $line_types{'OTHER_TELLS_GROUP'} =
 
    input line:
 
-      Soandso begins to cast a spell.
+      [Mon Oct 13 00:42:36 2003] Soandso begins to cast a spell.
 
    output hash ref:
 
       {
-         caster => 'Soandso',
+         line_type  => 'OTHER_CASTS',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         caster     => 'Soandso',
       };
 
    comments:
@@ -1331,7 +1435,7 @@ $line_types{'OTHER_TELLS_GROUP'} =
 
 =cut
 
-$line_types{'OTHER_CASTS'} =
+push @line_types,
    {
    rx      => qr/\A(.+?) begins to cast a spell\.\Z/,
    handler => sub
@@ -1339,7 +1443,8 @@ $line_types{'OTHER_CASTS'} =
       my ($caster) = @_;
       return
          {
-         caster => ucfirst $caster,
+         line_type  => 'OTHER_CASTS',
+         caster     => ucfirst $caster,
          };
       }
 
@@ -1349,14 +1454,16 @@ $line_types{'OTHER_CASTS'} =
 
    input line:
 
-      Soandso scores a critical hit! (126)
+      [Mon Oct 13 00:42:36 2003] Soandso scores a critical hit! (126)
 
    output hash ref:
 
       {
-         attacker => 'Soandso',
-         type     => 'hit',
-         amount   => '126',
+         line_type  => 'CRITICAL_SCORE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'Soandso',
+         type       => 'hit',
+         amount     => '126',
       };
 
    comments:
@@ -1365,7 +1472,7 @@ $line_types{'OTHER_CASTS'} =
 
 =cut
 
-$line_types{'CRITICAL_SCORE'} =
+push @line_types,
    {
    rx      => qr/\A(\w+) scores a critical (hit|blast)! \((\d+)\)\Z/,
    handler => sub
@@ -1373,9 +1480,10 @@ $line_types{'CRITICAL_SCORE'} =
       my ($attacker, $type, $amount) = @_;
       return
          {
-         attacker => $attacker,
-         type     => $type,
-         amount   => $amount,
+         line_type  => 'CRITICAL_SCORE',
+         attacker   => $attacker,
+         type       => $type,
+         amount     => $amount,
          };
       }
 
@@ -1385,14 +1493,16 @@ $line_types{'CRITICAL_SCORE'} =
 
    input line:
 
-      Soandso has healed you for 456 points of damage.
+      [Mon Oct 13 00:42:36 2003] Soandso has healed you for 456 points of damage.
 
    output hash ref:
 
       {
-         healer => 'Soandso',
-         healee => 'you',
-         amount => '456',
+         line_type  => 'PLAYER_HEALED',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         healer     => 'Soandso',
+         healee     => 'you',
+         amount     => '456',
       };
 
    comments:
@@ -1401,7 +1511,7 @@ $line_types{'CRITICAL_SCORE'} =
 
 =cut
 
-$line_types{'PLAYER_HEALED'} =
+push @line_types,
    {
    rx      => qr/\A(\w+) (?:have|has) healed (\w+) for (\d+) points of damage.\Z/,
    handler => sub
@@ -1409,9 +1519,10 @@ $line_types{'PLAYER_HEALED'} =
       my ($healer, $healee, $amount) = @_;
       return
          {
-         healer => $healer,
-         healee => $healee,
-         amount => $amount,
+         line_type  => 'PLAYER_HEALED',
+         healer     => $healer,
+         healee     => $healee,
+         amount     => $amount,
          };
       }
 
@@ -1421,13 +1532,15 @@ $line_types{'PLAYER_HEALED'} =
 
    input line:
 
-      Soandso says out of character, 'Stop following me :oP'
+      [Mon Oct 13 00:42:36 2003] Soandso says out of character, 'Stop following me :oP'
 
    output hash ref:
 
       {
-         speaker => 'Soandso',
-         spoken  => 'Stop following me :oP',
+         line_type  => 'SAYS_OOC',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speaker    => 'Soandso',
+         spoken     => 'Stop following me :oP',
       };
 
    comments:
@@ -1436,7 +1549,7 @@ $line_types{'PLAYER_HEALED'} =
 
 =cut
 
-$line_types{'SAYS_OOC'} =
+push @line_types,
    {
    rx      => qr/\A(\w+) says out of character, '(.+)'\Z/,
    handler => sub
@@ -1444,8 +1557,9 @@ $line_types{'SAYS_OOC'} =
       my ($speaker, $spoken) = @_;
       return
          {
-         speaker => $speaker,
-         spoken  => $spoken,
+         line_type  => 'SAYS_OOC',
+         speaker    => $speaker,
+         spoken     => $spoken,
          };
       }
 
@@ -1455,13 +1569,15 @@ $line_types{'SAYS_OOC'} =
 
    input line:
 
-      Soandso shouts, 'talk to vual stoutest'
+      [Mon Oct 13 00:42:36 2003] Soandso shouts, 'talk to vual stoutest'
 
    output hash ref:
 
       {
-         speaker => 'Soandso',
-         spoken  => 'talk to vual stoutest',
+         line_type  => 'OTHER_SHOUTS',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speaker    => 'Soandso',
+         spoken     => 'talk to vual stoutest',
       };
 
    comments:
@@ -1470,7 +1586,7 @@ $line_types{'SAYS_OOC'} =
 
 =cut
 
-$line_types{'OTHER_SHOUTS'} =
+push @line_types,
    {
    rx      => qr/\A(\w+) shouts, '(.+)'\Z/,
    handler => sub
@@ -1478,8 +1594,9 @@ $line_types{'OTHER_SHOUTS'} =
       my ($speaker, $spoken) = @_;
       return
          {
-         speaker => $speaker,
-         spoken  => $spoken,
+         line_type  => 'OTHER_SHOUTS',
+         speaker    => $speaker,
+         spoken     => $spoken,
          };
       }
 
@@ -1489,32 +1606,36 @@ $line_types{'OTHER_SHOUTS'} =
 
    input line:
 
-      [56 Outrider] Soandso (Half Elf) <The Foobles>
+      [Mon Oct 13 00:42:36 2003] [56 Outrider] Soandso (Half Elf) <The Foobles>
 
    output hash ref:
 
       {
-         level => '56',
-         class => 'Outrider',
-         name  => 'Soandso',
-         race  => 'Half Elf',
-         guild => 'The Foobles',
-         zone  => '',
+         line_type  => 'PLAYER_LISTING',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         level      => '56',
+         class      => 'Outrider',
+         name       => 'Soandso',
+         race       => 'Half Elf',
+         guild      => 'The Foobles',
+         zone       => '',
       };
 
    input line:
 
-      [65 Deceiver] Soandso (Barbarian) <The Foobles> ZONE: potranquility
+      [Mon Oct 13 00:42:36 2003] [65 Deceiver] Soandso (Barbarian) <The Foobles> ZONE: potranquility
 
    output hash ref:
 
       {
-         level => '65',
-         class => 'Deceiver',
-         name  => 'Soandso',
-         race  => 'Barbarian',
-         guild => 'The Foobles',
-         zone  => 'potranquility',
+         line_type  => 'PLAYER_LISTING',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         level      => '65',
+         class      => 'Deceiver',
+         name       => 'Soandso',
+         race       => 'Barbarian',
+         guild      => 'The Foobles',
+         zone       => 'potranquility',
       };
 
    comments:
@@ -1523,7 +1644,7 @@ $line_types{'OTHER_SHOUTS'} =
 
 =cut
 
-$line_types{'PLAYER_LISTING'} =
+push @line_types,
    {
    rx      => qr/\A(?:AFK )?\[(\d+) (.+?)\] (\w+) \((.+?)\) (?:<(.+?)>)? ?(?:ZONE: (\w+))?\s*\Z/,
    handler => sub
@@ -1531,12 +1652,13 @@ $line_types{'PLAYER_LISTING'} =
       my ($level, $class, $name, $race, $guild, $zone) = @_;
       return
          {
-         level => ($level || ''),
-         class => ($class || ''),
-         name  => $name,
-         race  => ($race  || ''),
-         guild => ($guild || ''),
-         zone  => ($zone  || ''),
+         line_type  => 'PLAYER_LISTING',
+         level      => ($level || ''),
+         class      => ($class || ''),
+         name       => $name,
+         race       => ($race  || ''),
+         guild      => ($guild || ''),
+         zone       => ($zone  || ''),
          };
       }
 
@@ -1546,12 +1668,14 @@ $line_types{'PLAYER_LISTING'} =
 
    input line:
 
-      Your Flame Lick spell has worn off.
+      [Mon Oct 13 00:42:36 2003] Your Flame Lick spell has worn off.
 
    output hash ref:
 
       {
-         spell => 'Flame Lick',
+         line_type  => 'YOUR_SPELL_WEARS_OFF',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         spell      => 'Flame Lick',
       };
 
    comments:
@@ -1560,7 +1684,7 @@ $line_types{'PLAYER_LISTING'} =
 
 =cut
 
-$line_types{'YOUR_SPELL_WEARS_OFF'} =
+push @line_types,
    {
    rx      => qr/\AYour (.+?) spell has worn off\.\Z/,
    handler => sub
@@ -1568,7 +1692,8 @@ $line_types{'YOUR_SPELL_WEARS_OFF'} =
       my ($spell) = @_;
       return
          {
-         spell => $spell,
+         line_type  => 'YOUR_SPELL_WEARS_OFF',
+         spell      => $spell,
          };
       }
 
@@ -1578,12 +1703,14 @@ $line_types{'YOUR_SPELL_WEARS_OFF'} =
 
    input line:
 
-      You have successfully completed your adventure.  You received 22 adventure points.  You have 30 minutes to exit this zone.
+      [Mon Oct 13 00:42:36 2003] You have successfully completed your adventure.  You received 22 adventure points.  You have 30 minutes to exit this zone.
 
    output hash ref:
 
       {
-         amount => '22',
+         line_type  => 'WIN_ADVENTURE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         amount     => '22',
       };
 
    comments:
@@ -1592,7 +1719,7 @@ $line_types{'YOUR_SPELL_WEARS_OFF'} =
 
 =cut
 
-$line_types{'WIN_ADVENTURE'} =
+push @line_types,
    {
    rx      => qr/\AYou have successfully completed your adventure.  You received (\d+) adventure points.  You have 30 minutes to exit this zone\.\Z/,
    handler => sub
@@ -1600,7 +1727,8 @@ $line_types{'WIN_ADVENTURE'} =
       my ($amount) = @_;
       return
          {
-         amount => $amount,
+         line_type  => 'WIN_ADVENTURE',
+         amount     => $amount,
          };
       }
 
@@ -1610,12 +1738,14 @@ $line_types{'WIN_ADVENTURE'} =
 
    input line:
 
-      You have spent 40 adventure points.
+      [Mon Oct 13 00:42:36 2003] You have spent 40 adventure points.
 
    output hash ref:
 
       {
-         amount => '40',
+         line_type  => 'SPEND_ADVENTURE_POINTS',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         amount     => '40',
       };
 
    comments:
@@ -1624,7 +1754,7 @@ $line_types{'WIN_ADVENTURE'} =
 
 =cut
 
-$line_types{'SPEND_ADVENTURE_POINTS'} =
+push @line_types,
    {
    rx      => qr/\AYou have spent (\d+) adventure points\.\Z/,
    handler => sub
@@ -1632,7 +1762,8 @@ $line_types{'SPEND_ADVENTURE_POINTS'} =
       my ($amount) = @_;
       return
          {
-         amount => $amount,
+         line_type  => 'SPEND_ADVENTURE_POINTS',
+         amount     => $amount,
          };
       }
 
@@ -1642,22 +1773,26 @@ $line_types{'SPEND_ADVENTURE_POINTS'} =
 
    input line:
 
-      You gain party experience!!
+      [Mon Oct 13 00:42:36 2003] You gain party experience!!
 
    output hash ref:
 
       {
-         gainer => 'party',
+         line_type  => 'GAIN_EXPERIENCE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         gainer     => 'party',
       };
 
    input line:
 
-      You gain experience!!
+      [Mon Oct 13 00:42:36 2003] You gain experience!!
 
    output hash ref:
 
       {
-         gainer => '',
+         line_type  => 'GAIN_EXPERIENCE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         gainer     => '',
       };
 
    comments:
@@ -1666,7 +1801,7 @@ $line_types{'SPEND_ADVENTURE_POINTS'} =
 
 =cut
 
-$line_types{'GAIN_EXPERIENCE'} =
+push @line_types,
    {
    rx      => qr/\AYou gain (?:(party) )?experience!!\Z/,
    handler => sub
@@ -1674,7 +1809,8 @@ $line_types{'GAIN_EXPERIENCE'} =
       my ($gainer) = @_;
       return
          {
-         gainer => ($gainer || ''),
+         line_type  => 'GAIN_EXPERIENCE',
+         gainer     => ($gainer || ''),
          };
       }
 
@@ -1693,13 +1829,11 @@ fooble, E<lt>fooble@cpan.orgE<gt>
 
 =over 4
 
-=item - adaptive sorting
+=item - optimize ordering of @line_types
 
-=item - user specified execution order
+=item - make testing prettier (Test::Harness?)
 
-=item - default execution order (be sure merchant tells with prices get checked prior to regular tells)
-
-=item - make sure MELEE_DAMAGE doesn't pick up some non-melee damage
+=item - add unrecognized yet useful lines
 
 =back
 
