@@ -61,13 +61,13 @@ log file, which are unparsable by L<Games::EverQuest::LogLineParser>.
 =head1 SYNOPSIS
 
    ## output to STDOUT
-   eqlog_eqlog_unrecognized_lines.pl c:\everquest\eqlog_Soandso_server.txt
+   eqlog_unrecognized_lines.pl c:\everquest\eqlog_Soandso_server.txt
 
    ## output to file
-   eqlog_eqlog_unrecognized_lines.pl c:\everquest\eqlog_Soandso_server.txt eqlog.csv
+   eqlog_unrecognized_lines.pl c:\everquest\eqlog_Soandso_server.txt eqlog.csv
 
    ## output statistics
-   eqlog_eqlog_unrecognized_lines.pl -s c:\everquest\eqlog_Soandso_server.txt eqlog.csv
+   eqlog_unrecognized_lines.pl -s c:\everquest\eqlog_Soandso_server.txt eqlog.csv
 
 =head1 DESCRIPTION
 
@@ -92,7 +92,7 @@ module.
 
 =head1 AUTHOR
 
-fooble, E<lt>fooble@cpan.orgE<gt>
+Daniel B. Boorstein, E<lt>danboo@cpan.orgE<gt>
 
 =head1 TO DO
 

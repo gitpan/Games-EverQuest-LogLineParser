@@ -137,7 +137,7 @@ our @ISA = qw/ Exporter /;
 our @EXPORT = qw/ parse_eq_line parse_eq_line_type parse_eq_time_stamp
                   all_possible_line_types all_possible_keys /;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 my (@line_types, %line_types);
 
@@ -274,7 +274,7 @@ sub all_possible_keys
 
 push @line_types,
    {
-   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul|backstab|claw)(?:s|es)? (?!by non-melee)(.+?) for (\d+) points? of damage\.\z/,
+   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul|backstab|claw|strike)(?:s|es)? (?!by non-melee)(.+?) for (\d+) points? of damage\.\z/,
    handler => sub
       {
       my ($attacker, $attack, $attackee, $amount) = @_;

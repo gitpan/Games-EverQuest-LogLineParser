@@ -131,7 +131,7 @@ types should be tested.
 
 =head1 AUTHOR
 
-fooble, E<lt>fooble@cpan.orgE<gt>
+Daniel B. Boorstein, E<lt>danboo@cpan.orgE<gt>
 
 =head1 TO DO
 
