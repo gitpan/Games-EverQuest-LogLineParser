@@ -27,7 +27,7 @@ interesting bits from an EverQuest log file.
 
 =over 4
 
-=item parse_eq_line($eq_line)
+=item C<parse_eq_line($eq_line)>
 
 Returns a hash ref, containing variable keys depending on the determined line
 type of the given log line. If the line was not recognized, then false is
@@ -42,7 +42,7 @@ though some of the values may be C<undef> or empty.
 For a list of line types (and associated keys) see the L<LINE TYPES> section
 below.
 
-=item parse_eq_line_type($line_type, $eq_line)
+=item C<parse_eq_line_type($line_type, $eq_line)>
 
 If you expect a line to be of a certain type, and want to test or parse it as
 that type, you can use this function. Call it with the expected line type
@@ -61,7 +61,7 @@ though some of the values may be C<undef> or empty.
 For a list of line types (and associated keys) see the L<LINE TYPES> section
 below.
 
-=item parse_eq_time_stamp($parsed_line->{'time_stamp'})
+=item C<parse_eq_time_stamp($parsed_line->{'time_stamp'})>
 
 Given the C<time_stamp> value from a parsed line, returns a hash ref with the
 following structure:
@@ -77,12 +77,12 @@ following structure:
     year  => '2003',
    }
 
-=item all_possible_line_types()
+=item C<all_possible_line_types()>
 
 Returns a list of all possible line types for the hash refs that are returned by
 C<parse_eq_line()>.
 
-=item all_possible_keys()
+=item C<all_possible_keys()>
 
 Returns a list of all possible keys for the hash refs that are returned by
 C<parse_eq_line()>.
@@ -137,7 +137,7 @@ our @ISA = qw/ Exporter /;
 our @EXPORT = qw/ parse_eq_line parse_eq_line_type parse_eq_time_stamp
                   all_possible_line_types all_possible_keys /;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 my (@line_types, %line_types);
 
@@ -270,7 +270,7 @@ sub all_possible_keys
 
 push @line_types,
    {
-   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul)(?:s|es)? (?!by non-melee)(.+?) for (\d+) points? of damage\.\Z/,
+   rx      => qr/\A(.+?) (slash|hit|kick|pierce|bash|punch|crush|bite|maul|backstab|claw)(?:s|es)? (?!by non-melee)(.+?) for (\d+) points? of damage\.\Z/,
    handler => sub
       {
       my ($attacker, $attack, $attackee, $amount) = @_;
@@ -322,7 +322,7 @@ push @line_types,
       }
    };
 
-=item MOB_MISSES_YOU
+=item OTHER_MISSES
 
    input line:
 
@@ -331,10 +331,25 @@ push @line_types,
    output hash ref:
 
       {
-         line_type  => 'MOB_MISSES_YOU',
+         line_type  => 'OTHER_MISSES',
          time_stamp => '[Mon Oct 13 00:42:36 2003] ',
          attacker   => 'A Bloodguard crypt sentry',
          attack     => 'hit',
+         attackee   => 'YOU',
+      };
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Soandso tries to slash a Bloodguard crypt sentry, but misses!
+
+   output hash ref:
+
+      {
+         line_type  => 'OTHER_MISSES',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         attacker   => 'Soandso',
+         attack     => 'slash',
+         attackee   => 'a Bloodguard crypt sentry',
       };
 
    comments:
@@ -345,15 +360,16 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\A(.+?) tries to (\w+) YOU, but misses!\Z/,
+   rx      => qr/\A(.+?) tries to (\w+) (.+?), but misses!\Z/,
    handler => sub
       {
-      my ($attacker, $attack) = @_;
+      my ($attacker, $attack, $attackee) = @_;
       return
          {
-         line_type  => 'MOB_MISSES_YOU',
+         line_type  => 'OTHER_MISSES',
          attacker   => $attacker,
          attack     => $attack,
+         attackee   => $attackee,
          };
       }
    };
@@ -1250,14 +1266,14 @@ push @line_types,
 
    input line:
 
-      [Mon Oct 13 00:42:36 2003] You tell your party, 'can you say /pet get lost'
+      [Mon Oct 13 00:42:36 2003] You say, 'thanks!'
 
    output hash ref:
 
       {
          line_type  => 'YOU_SAY',
          time_stamp => '[Mon Oct 13 00:42:36 2003] ',
-         spoken     => 'can you say /pet get lost',
+         spoken     => 'thanks!',
       };
 
    comments:
@@ -1268,7 +1284,7 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\AYour say, '(.+)'\Z/,
+   rx      => qr/\AYou say, '(.+)'\Z/,
    handler => sub
       {
       my ($spoken) = @_;
@@ -1341,7 +1357,7 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\AYou told (\w+), '(.+)'\Z/,
+   rx      => qr/\AYou told (\w+),? '(.+)'\Z/,
    handler => sub
       {
       my ($speakee, $spoken) = @_;
@@ -1350,6 +1366,55 @@ push @line_types,
          line_type  => 'YOU_TELL_OTHER',
          speakee    => $speakee,
          spoken     => $spoken,
+         };
+      }
+
+   };
+
+=item MERCHANT_TELLS_YOU
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Magus Delin tells you, 'I'll give you 3 gold 6 silver per Geode'
+
+   output hash ref:
+
+      {
+         line_type  => 'MERCHANT_TELLS_YOU',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         platinum   => 0,
+         gold       => '3',
+         silver     => '6',
+         copper     => 0,
+         merchant   => 'Magus Delin',
+         item       => 'Geode',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+## this must be before OTHER_TELLS_YOU
+
+push @line_types,
+   {
+   rx      => qr/\A([^,]+?) tells you, 'I\'ll give you (.+?) per (.+?)'\Z/,
+   handler => sub
+      {
+      my ($merchant, $money, $item) = @_;
+      $money ||= '';
+      my %moneys = reverse split ' ', $money;
+      return
+         {
+         line_type  => 'MERCHANT_TELLS_YOU',
+         platinum   => $moneys{'platinum'} || 0,
+         gold       => $moneys{'gold'}     || 0,
+         silver     => $moneys{'silver'}   || 0,
+         copper     => $moneys{'copper'}   || 0,
+         merchant   => $merchant,
+         item       => $item,
          };
       }
 
@@ -1378,7 +1443,7 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\A(\w+) tells you, '(.+)'\Z/,
+   rx      => qr/\A([^,]+?) tells you, '(.+)'\Z/,
    handler => sub
       {
       my ($speaker, $spoken) = @_;
@@ -1607,6 +1672,43 @@ push @line_types,
       return
          {
          line_type  => 'SAYS_OOC',
+         speaker    => $speaker,
+         spoken     => $spoken,
+         };
+      }
+
+   };
+
+=item OTHER_AUCTIONS
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Soandso auctions, 'WMBS - 4k OBO'
+
+   output hash ref:
+
+      {
+         line_type  => 'OTHER_AUCTIONS',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         speaker    => 'Soandso',
+         spoken     => 'WMBS - 4k OBO',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\A(\w+) auctions, '(.+)'\Z/,
+   handler => sub
+      {
+      my ($speaker, $spoken) = @_;
+      return
+         {
+         line_type  => 'OTHER_AUCTIONS',
          speaker    => $speaker,
          spoken     => $spoken,
          };
@@ -1921,13 +2023,26 @@ __END__
 
 fooble, E<lt>fooble@cpan.orgE<gt>
 
+=head1 BUGS
+
+I imagine the primary source of faults in this module will be in which line
+types it understands, and how well it can distinguish them. If you come
+across lines in you log files that I haven't handled
+(see L<eqlog_unrecognized_lines.pl>), or that are handled incorrectly, please
+send the line to me, with an explanation of why it was not parsed in
+accordance with your expectations. If you're up to it, a patch (test suite
+too please) for handling the offending line would be great.
+
 =head1 TO DO
 
 =over 4
 
-=item - optimize ordering of @line_types
-
 =item - add unrecognized yet useful lines
+
+   YOU_SHOUT, YOU_OOC, YOU_AUCTION, GAME_TIME, EARTH_TIME, MAGIC_DIE,
+   RANDOM_NUMBER, MOTD, GUILD_MOTD, BEGIN_MEMORIZE
+
+=item - optimize ordering of @line_types
 
 =back
 

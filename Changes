@@ -1,24 +1,33 @@
 Revision history for Perl extension Games::EverQuest::LogLineParser.
 
-0.04  Sat Nov 15 01:39:15 2003
+0.05  11/16/03
+   - added documentation to included scripts
+   - 'backstab' and 'claw' are recognized in MELEE_DAMAGE
+   - changed MOB_MISSES_YOU to OTHER_MISSES (handle misses by PCs as well now)
+   - handle tells with compound names (NPCs)
+   - added MERCHANT_TELLS_YOU to capture merchant prices
+   - added OTHER_AUCTIONS line type
+   - handle '[queued]' YOU_TOLD_OTHER messages
+
+0.04  11/15/03
    - merged MELEE_DAMAGE and MOB_HITS_YOU line types
    - no longer force mob names into ucfirst
    - added parse_eq_line_type() for parsing a line with a particular
       expectation of its type
 
-0.03  Thu Nov 13 10:38:12 2003
+0.03  11/13/03
    - added eqlog_line_type_frequency.pl script to distribution
    - added eqlog_unrecognized_lines.pl script to distribution
    - completed parsing of PLAYER_LISTING line types
    - now makes use of ./t/ dir and Test::Harness
 
-0.02  Wed Nov 12 08:26:02 2003
+0.02  11/12/03
    - converted hash based implementation to array based (better control
       of processing order, and likely faster)
    - included eqlog2csv.pl script to distribution
    - added 'time_stamp' and 'line_type' keys to doc examples
 
-0.01  Wed Nov  5 07:03:42 2003
+0.01  11/05/03
    - original version; created by h2xs 1.21 with options
       -AX -n Games::EverQuest::LogLineParser
 

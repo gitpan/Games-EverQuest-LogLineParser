@@ -53,9 +53,20 @@ my @tests = (
       {
       in => qq|[Sat Sep 27 23:18:53 2003] A Bloodguard crypt sentry tries to hit YOU, but misses!\n|,
       out => {
-         line_type => 'MOB_MISSES_YOU',
-         attacker => 'A Bloodguard crypt sentry',
-         attack   => 'hit',
+         line_type => 'OTHER_MISSES',
+         attacker  => 'A Bloodguard crypt sentry',
+         attack    => 'hit',
+         attackee  => 'YOU',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Soandso tries to slash a Bloodguard crypt sentry, but misses!\n|,
+      out => {
+         line_type => 'OTHER_MISSES',
+         attacker  => 'Soandso',
+         attack    => 'slash',
+         attackee  => 'a Bloodguard crypt sentry',
          },
       },
 
@@ -290,6 +301,14 @@ my @tests = (
       },
 
       {
+      in => qq|[Sat Sep 27 23:18:53 2003] You say, 'thanks!'\n|,
+      out => {
+         line_type => 'YOU_SAY',
+         spoken  => 'thanks!',
+         },
+      },
+
+      {
       in => qq|[Sat Sep 27 23:18:53 2003] Soandso says, 'I aim to please :)'\n|,
       out => {
          line_type => 'OTHER_SAYS',
@@ -308,11 +327,33 @@ my @tests = (
       },
 
       {
+      in => qq|[Sat Sep 27 23:18:53 2003] You told Soandso '[queued], good, one success earlier. acutally collected 27 items.'\n|,
+      out => {
+         line_type => 'YOU_TELL_OTHER',
+         speakee => 'Soandso',
+         spoken  => '[queued], good, one success earlier. acutally collected 27 items.',
+         },
+      },
+
+      {
       in => qq|[Sat Sep 27 23:18:53 2003] Soandso tells you, 'hows the adv?'\n|,
       out => {
          line_type => 'OTHER_TELLS_YOU',
          speaker => 'Soandso',
          spoken  => 'hows the adv?',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Magus Delin tells you, 'I\'ll give you 3 gold 6 silver per Geode'\n|,
+      out => {
+         line_type  => 'MERCHANT_TELLS_YOU',
+         platinum   => 0,
+         gold       => '3',
+         silver     => '6',
+         copper     => 0,
+         merchant   => 'Magus Delin',
+         item       => 'Geode',
          },
       },
 
@@ -376,6 +417,15 @@ my @tests = (
          line_type => 'OTHER_SHOUTS',
          speaker => 'Soandso',
          spoken  => 'talk to vual stoutest',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Soandso auctions, 'WMBS - 4k OBO'\n|,
+      out => {
+         line_type => 'OTHER_AUCTIONS',
+         speaker => 'Soandso',
+         spoken  => 'WMBS - 4k OBO',
          },
       },
 

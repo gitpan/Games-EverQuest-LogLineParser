@@ -38,3 +38,48 @@ while (<$eqlog_fh>)
 
 close $eqlog_fh;
 close $output_fh;
+
+__END__
+=head1 NAME
+
+eqlog2csv.pl - Perl script that converts an EverQuest log file into a
+CSV-like (separator is actually '|') file.
+
+=head1 SYNOPSIS
+
+   ## output to STDOUT
+   eqlog2csv.pl c:\everquest\eqlog_Soandso_server.txt
+
+      or
+
+   ## output to file
+   eqlog2csv.pl c:\everquest\eqlog_Soandso_server.txt eqlog.csv
+
+=head1 DESCRIPTION
+
+C<eqlog2csv.pl> converts the given EverQuest log file into a CSV-like file,
+using the pipe (i.e., '|) character rather than the comma. Each parsable
+line from the log file corresponds to a line in the output. The column
+headers are the superset of all possible keys, as returned in the hash ref
+frin C<Games::EverQuest::LogLineParser::parse_eq_line()>.
+
+=head1 AUTHOR
+
+fooble, E<lt>fooble@cpan.orgE<gt>
+
+=head1 TO DO
+
+=over 4
+
+=item - user-specified separator character
+
+=item - use Text::CSV_XS for proper CSV output
+
+=back
+
+=head1 SEE ALSO
+
+L<Games::EverQuest::LogLineParser>
+
+=cut
+
