@@ -137,18 +137,15 @@ our @ISA = qw/ Exporter /;
 our @EXPORT = qw/ parse_eq_line parse_eq_line_type parse_eq_time_stamp
                   all_possible_line_types all_possible_keys /;
 
-our $VERSION = '0.08';
+our @EXPORT_OK = qw( coins_to_platinum );
+
+our $VERSION = '0.09';
 
 my (@line_types, %line_types);
 
-INIT
-   {
-   for my $line_type (@line_types)
-      {
-      my $line_type_name = $line_type->{'handler'}->()->{'line_type'};
-      $line_types{$line_type_name} = $line_type;
-      }
-   }
+
+# $BAZAAR_PRICE is used in many bzrlog regexps.
+my $BAZAAR_PRICE = qr/(?: (\d+)p)?(?: (\d+)g)?(?: (\d+)s)?(?: (\d+)c)?/;
 
 ## returns a parsed line hash ref if the line is understood, else false
 sub parse_eq_line
@@ -167,6 +164,9 @@ sub parse_eq_line
          {
          my $parsed_line = $line_type->{'handler'}->(@parts);
          $parsed_line->{'time_stamp'} = $time_stamp;
+         if(exists $parsed_line->{platinum}) {
+            $parsed_line->{value} = coins_to_platinum(%$parsed_line);
+         }
          return $parsed_line;
          }
       }
@@ -193,6 +193,9 @@ sub parse_eq_line_type
       {
       my $parsed_line = $line_types{$line_type_name}->{'handler'}->(@parts);
       $parsed_line->{'time_stamp'} = $time_stamp;
+      if(exists $parsed_line->{platinum}) {
+         $parsed_line->{value} = coins_to_platinum(%$parsed_line);
+      }
       return $parsed_line;
       }
 
@@ -232,6 +235,9 @@ sub all_possible_line_types
    }
 
 ## returns all possible keys from the set of all parsed line hash refs
+## 'time_stamp' and 'value' are special-cased, as they're automatically
+## added after the line is parsed.
+
 sub all_possible_keys
    {
 
@@ -245,9 +251,20 @@ sub all_possible_keys
          }
       }
 
-   return ( sort (keys %all_keys, 'time_stamp') );
+   return ( sort (keys %all_keys, 'time_stamp', 'value') );
 
    }
+
+## Converts a list of coins into a decimalised platinum figure.
+## eg: 12pp 5gp 3sp 6cp = 12.536
+sub coins_to_platinum {
+   my %coins = @_;
+
+   return  $coins{platinum}            + 
+          ($coins{gold    } || 0)/  10 + 
+          ($coins{silver  } || 0)/ 100 +
+          ($coins{copper  } || 0)/1000;
+}
 
 =item MELEE_DAMAGE
 
@@ -619,6 +636,7 @@ push @line_types,
          gold       => '16',
          silver     => '20',
          copper     => '36',
+         value      => 68.8360,
       };
 
    comments:
@@ -828,6 +846,7 @@ push @line_types,
          gold       => '1',
          silver     => '2',
          copper     => '4',
+         value      => 0.124,
          merchant   => 'Cavalier Aodus',
       };
 
@@ -908,6 +927,7 @@ push @line_types,
          gold       => 0,
          silver     => 0,
          copper     => 0,
+         value      => 120.000,
          merchant   => 'Magus Delin',
          item       => 'Fire Emerald Ring',
       };
@@ -954,6 +974,7 @@ push @line_types,
          gold       => '30',
          silver     => '25',
          copper     => '33',
+         value      => 166.2830,
       };
 
    comments:
@@ -1495,6 +1516,7 @@ push @line_types,
          gold       => '3',
          silver     => '6',
          copper     => 0,
+         value      => 0.360,
          merchant   => 'Magus Delin',
          item       => 'Geode',
       };
@@ -1509,7 +1531,7 @@ push @line_types,
 
 push @line_types,
    {
-   rx      => qr/\A([^,]+?) tells you, 'I\'ll give you (.+?) per (.+?)'\z/,
+   rx      => qr/\A([^,]+?) tells you, 'I\'ll give you (.+?) (?:per|for the) (.+?)\.?'\z/,
    handler => sub
       {
       my ($merchant, $money, $item) = @_;
@@ -1528,6 +1550,57 @@ push @line_types,
       }
 
    };
+
+=item MERCHANT_PRICE
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Gaelsori Heriseron tells you, 'That'll be 1 platinum 2 gold 5 silver 9 copper for the Leather Wristbands.'
+
+   output hash ref:
+
+      {
+         line_type  => 'MERCHANT_PRICE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         platinum   => '1',
+         gold       => '2',
+         silver     => '5',
+         copper     => '9',
+         value      => 1.259,
+         merchant   => 'Gaelsori Heriseron',
+         item       => 'Leather Wristbands',
+      };
+
+   comments:
+
+      none
+
+=cut
+
+## this must be before OTHER_TELLS_YOU
+
+push @line_types,
+   {
+   rx      => qr/\A([^,]+?) tells you, 'That\'ll be (.+?) (?:per|for the) (.+?)\.?'\z/,
+   handler => sub
+      {
+      my ($merchant, $money, $item) = @_;
+      $money ||= '';
+      my %moneys = reverse split ' ', $money;
+      return
+         {
+         line_type  => 'MERCHANT_PRICE',
+         platinum   => $moneys{'platinum'} || 0,
+         gold       => $moneys{'gold'}     || 0,
+         silver     => $moneys{'silver'}   || 0,
+         copper     => $moneys{'copper'}   || 0,
+         merchant   => $merchant,
+         item       => $item,
+         };
+      }
+
+   };
+
 
 =item OTHER_TELLS_YOU
 
@@ -2433,6 +2506,142 @@ push @line_types,
 
    };
 
+=item BAZAAR_TRADER_MODE
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Bazaar Trader Mode *ON*
+
+   output hash ref:
+
+      {
+         line_type  => 'BAZAAR_TRADER_MODE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         status     => 1,
+      };
+
+   comments:
+
+      status will be '0' for OFF, and '1' for ON.
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\ABazaar Trader Mode \*(ON|OFF)\*\z/,
+   handler => sub
+      {
+      # This gets called during module load with no arguments,
+      # but we'd rather the undefined $mode not to cause a warning.
+      no warnings 'uninitialized';
+      my ($mode) = @_;
+      return
+         {
+         line_type  => 'BAZAAR_TRADER_MODE',
+         status     => ($mode eq "ON" ? 1 : 0),
+         };
+      }
+   };
+
+
+=item BAZAAR_TRADER_PRICE
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003]  18.) Bone Chips (Price  2g 5s).
+
+   output hash ref:
+
+      {
+         line_type  => 'BAZAAR_TRADER_PRICE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         item       => 'Bone Chips',
+         platinum   => '0',
+         gold       => '2',
+         silver     => '5',
+         copper     => '0',
+         value      => 0.250,
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\A \d+\.\) (.+?) \(Price $BAZAAR_PRICE\)\.\z/,
+   handler => sub
+      {
+      my ($item, $pp, $gp, $sp, $cp) = @_;
+      return
+         {
+         line_type  => 'BAZAAR_TRADER_PRICE',
+         item       => $item,
+         platinum   => $pp || 0,
+         gold       => $gp || 0,
+         silver     => $sp || 0,
+         copper     => $cp || 0,
+         };
+      }
+   };
+
+=item BAZAAR_SALE
+
+   input line:
+
+      [Mon Oct 13 00:42:36 2003] Letsmekkadyl purchased 17 Bone Chips for ( 3p 2g 3s).
+
+   output hash ref:
+
+      {
+         line_type  => 'BAZAAR_SALE',
+         time_stamp => '[Mon Oct 13 00:42:36 2003] ',
+         buyer      => 'Letsmekkadyl',
+         item       => 'Leather Wristbands',
+         quantity   => 17,
+         platinum   => '3',
+         gold       => '2',
+         silver     => '3',
+         copper     => '0',
+         value      => 3.230,
+      };
+
+   comments:
+
+      none
+
+=cut
+
+push @line_types,
+   {
+   rx      => qr/\A(.+?) purchased (\d+) (.+?) for \($BAZAAR_PRICE\)\.\z/,
+   handler => sub
+      {
+      my ($buyer, $qty, $item, $pp, $gp, $sp, $cp) = @_;
+      return
+         {
+         line_type  => 'BAZAAR_SALE',
+         platinum   => $pp || 0,
+         gold       => $gp || 0,
+         silver     => $sp || 0,
+         copper     => $cp || 0,
+         buyer      => $buyer,
+         item       => $item,
+         quantity   => $qty,
+         };
+      }
+
+   };
+
+# Finally, we process every line in @line_types, ready to start.
+for my $line_type (@line_types)
+  {
+  my $line_type_name = $line_type->{'handler'}->()->{'line_type'};
+  $line_types{$line_type_name} = $line_type;
+  }
+
 1;
 __END__
 
@@ -2440,7 +2649,9 @@ __END__
 
 =head1 AUTHOR
 
-fooble, E<lt>fooble@cpan.orgE<gt>
+Dan Boorstein, E<lt>danboo@cpan.orgE<gt>
+
+Mainted by Paul Fenwick, E<lt>pjf@cpan.orgE<gt>
 
 =head1 BUGS
 

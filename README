@@ -16,7 +16,8 @@ To install this module type the following:
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2003 fooble
+Copyright (C) 2003-2004 Dan Boorstein
+Copyright (C) 2005      Paul Fenwick
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

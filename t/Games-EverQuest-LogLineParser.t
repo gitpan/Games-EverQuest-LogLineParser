@@ -3,12 +3,10 @@
 
 #########################
 
-# change 'tests => 1' to 'tests => last_test_to_print';
-
 use strict;
 use warnings;
 
-use Test::More 'no_plan';
+use Test::More tests => 144;
 
 BEGIN { use_ok('Games::EverQuest::LogLineParser') }
 
@@ -133,6 +131,7 @@ my @tests = (
          gold      => '16',
          silver    => '20',
          copper    => '36',
+         value     => 68.836
          },
       },
 
@@ -191,6 +190,7 @@ my @tests = (
          gold      => '1',
          silver    => '2',
          copper    => '5',
+         value     => 0.125,
          merchant  => 'Cavalier Aodus',
          },
       },
@@ -211,6 +211,7 @@ my @tests = (
          gold      => 0,
          silver    => 0,
          copper    => 0,
+         value     => 120,
          merchant  => 'Magus Delin',
          item      => 'Fire Emerald Ring',
          },
@@ -224,6 +225,7 @@ my @tests = (
          gold      => '30',
          silver    => '25',
          copper    => '33',
+         value     => 166.2830,
          },
       },
 
@@ -376,10 +378,40 @@ my @tests = (
          gold       => '3',
          silver     => '6',
          copper     => 0,
+         value      => 0.360,
          merchant   => 'Magus Delin',
          item       => 'Geode',
          },
       },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Merabo Sotath tells you, 'I\'ll give you 3 platinum 9 gold 5 copper for the Blood Sword.'\n|,
+      out => {
+         line_type  => 'MERCHANT_TELLS_YOU',
+         platinum   => '3',
+         gold       => '9',
+         silver     => '0',
+         copper     => '5',
+         value      => 3.905,
+         merchant   => 'Merabo Sotath',
+         item       => 'Blood Sword',
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Gaelsori Heriseron tells you, 'That\'ll be 1 platinum 2 gold 5 silver 9 copper for the Leather Wristbands.'\n|,
+      out => {
+         line_type  => 'MERCHANT_PRICE',
+         platinum   => '1',
+         gold       => '2',
+         silver     => '5',
+         copper     => '9',
+         value      => 1.259,
+         merchant   => 'Gaelsori Heriseron',
+         item       => 'Leather Wristbands',
+         },
+      },
+      
 
       {
       in => qq|[Sat Sep 27 23:18:53 2003] You tell your party, 'will keep an eye out'\n|,
@@ -494,7 +526,7 @@ my @tests = (
          guild => 'The Foobles',
          zone  => 'potranquility',
          lfg   => '',
-      },
+         },
       },
 
       {
@@ -618,6 +650,50 @@ my @tests = (
          },
       },
 
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Letsmekkadyl purchased 17 Bone Chips for ( 3p 2g 3s).\n|,
+      out => {
+         line_type => 'BAZAAR_SALE',
+         buyer     => 'Letsmekkadyl',
+         item      => 'Bone Chips',
+         quantity  => '17',
+         platinum  => '3',
+         gold      => '2',
+         silver    => '3',
+         copper    => '0',
+         value     => 3.230,
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Bazaar Trader Mode *ON*\n|,
+      out => {
+         line_type => 'BAZAAR_TRADER_MODE',
+         status    => 1,
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003] Bazaar Trader Mode *OFF*\n|,
+      out => {
+         line_type => 'BAZAAR_TRADER_MODE',
+         status    => 0,
+         },
+      },
+
+      {
+      in => qq|[Sat Sep 27 23:18:53 2003]  1.) Bone Chips (Price  2g 5s).\n|,
+      out => {
+         line_type => 'BAZAAR_TRADER_PRICE',
+         item      => 'Bone Chips',
+         platinum  => 0,
+         gold      => 2,
+         silver    => 5,
+         copper    => 0,
+         value     => 0.250,
+         },
+      },
+
 );
 
 for my $test (@tests)
@@ -627,6 +703,16 @@ for my $test (@tests)
 
    ## parse any
    my $parsed_line = parse_eq_line($test->{'in'});
+
+   # is_deeply breaks on lines that did not parse.  Instead we
+   # catch them manually.
+
+   if(not defined $parsed_line) {
+      fail("Did not parse: ".$test->{'in'});
+      fail("Did not parse: ".$test->{'in'});
+      next;
+   }
+
    is_deeply( $parsed_line, $test->{'out'}, $test->{'in'});
 
    ## parse type
